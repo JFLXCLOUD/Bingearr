@@ -122,12 +122,12 @@ Bingearr belongs in the ecosystem.
 
 ## 6. Phased roadmap
 
-### Phase 0 — Foundation
-- [ ] Repo scaffold (`backend/`, `frontend/`, `docker/`, `docs/`)
-- [ ] FastAPI app + SQLite + migrations + `X-Api-Key` auth
-- [ ] `MediaServerClient` interface; Plex implementation (read-only)
-- [ ] React UI shell matching NeXroll
-- [ ] Dockerfile + compose + healthcheck
+### Phase 0 — Foundation ✅
+- [x] Repo scaffold (`backend/`, `frontend/`, `docker/`) — docs still at repo root
+- [x] FastAPI app + SQLite + migrations + `X-Api-Key` auth
+- [x] `MediaServerClient` interface; Plex implementation (read-only)
+- [x] React UI shell matching NeXroll
+- [x] Dockerfile + compose + healthcheck
 
 ### Phase 1 — MVP (current focus)
 - [ ] Plex connection UI (URL + token / sign-in)
