@@ -1,0 +1,20 @@
+# Build context is the repo root; keep it lean.
+**/__pycache__/
+**/*.py[cod]
+**/.venv/
+**/venv/
+**/node_modules/
+**/dist/
+**/build/
+backend/static/
+**/.pytest_cache/
+**/.mypy_cache/
+**/.ruff_cache/
+data/
+*.db
+.env
+.env.*
+.git/
+.gitignore
+.gitattributes
+**/.DS_Store

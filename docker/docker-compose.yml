@@ -1,0 +1,21 @@
+# Build context is the repo root so the Dockerfile can see backend/ + frontend/.
+# From the repo root:  docker compose -f docker/docker-compose.yml up --build
+services:
+  bingearr:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+    image: bingearr:dev
+    container_name: bingearr
+    ports:
+      - "9494:9494"
+    environment:
+      - BINGEARR_DATA_DIR=/data
+      # Pin a key here, or leave unset to auto-generate (see container logs).
+      # - BINGEARR_API_KEY=change-me
+    volumes:
+      - bingearr_data:/data
+    restart: unless-stopped
+
+volumes:
+  bingearr_data:
