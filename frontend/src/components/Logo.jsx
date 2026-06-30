@@ -5,8 +5,8 @@ export default function Logo() {
         <svg viewBox="0 0 32 32" width="30" height="30" aria-hidden="true">
           <defs>
             <linearGradient id="logo-grad" x1="0" y1="0" x2="1" y2="1">
-              <stop offset="0" stopColor="#8b5cff" />
-              <stop offset="1" stopColor="#d65cff" />
+              <stop className="s1" offset="0" />
+              <stop className="s2" offset="1" />
             </linearGradient>
           </defs>
           <rect x="1.5" y="1.5" width="29" height="29" rx="9" fill="url(#logo-grad)" />

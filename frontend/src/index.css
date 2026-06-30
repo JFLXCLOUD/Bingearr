@@ -10,11 +10,15 @@
   --muted: #8b91a1;
   --faint: #5c6273;
 
-  --accent: #9b6cff;
-  --accent-2: #d65cff;
-  --accent-grad: linear-gradient(135deg, #8b5cff 0%, #d65cff 100%);
-  --accent-soft: rgba(155, 108, 255, 0.13);
-  --accent-line: rgba(155, 108, 255, 0.35);
+  /* Theme is driven by these two hues; everything else derives from them. */
+  --accent: #22d3c5;
+  --accent-2: #1fa3e0;
+  --accent-grad: linear-gradient(135deg, var(--accent) 0%, var(--accent-2) 100%);
+  --accent-soft: color-mix(in srgb, var(--accent) 14%, transparent);
+  --accent-line: color-mix(in srgb, var(--accent) 38%, transparent);
+  --accent-glow: color-mix(in srgb, var(--accent) 32%, transparent);
+  --accent-haze: color-mix(in srgb, var(--accent) 8%, transparent);
+  --accent-haze-2: color-mix(in srgb, var(--accent-2) 6%, transparent);
 
   --ok: #3ecf8e;
   --ok-soft: rgba(62, 207, 142, 0.14);
@@ -37,8 +41,8 @@ body {
   font-family: "Inter", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
   color: var(--text);
   background:
-    radial-gradient(1100px 600px at 100% -10%, rgba(155, 108, 255, 0.07), transparent 60%),
-    radial-gradient(900px 500px at -10% 110%, rgba(214, 92, 255, 0.05), transparent 55%),
+    radial-gradient(1100px 600px at 100% -10%, var(--accent-haze), transparent 60%),
+    radial-gradient(900px 500px at -10% 110%, var(--accent-haze-2), transparent 55%),
     var(--bg);
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
@@ -77,8 +81,10 @@ button { font-family: inherit; }
 .logo-mark {
   display: grid;
   place-items: center;
-  filter: drop-shadow(0 4px 10px rgba(155, 108, 255, 0.35));
+  filter: drop-shadow(0 4px 10px var(--accent-glow));
 }
+.logo-mark .s1 { stop-color: var(--accent); }
+.logo-mark .s2 { stop-color: var(--accent-2); }
 .logo-word { font-size: 20px; font-weight: 800; letter-spacing: -0.02em; }
 .logo-word span {
   background: var(--accent-grad);
@@ -222,7 +228,7 @@ button { font-family: inherit; }
 .btn-primary {
   background: var(--accent-grad);
   color: #fff;
-  box-shadow: 0 6px 16px rgba(139, 92, 255, 0.28);
+  box-shadow: 0 6px 16px var(--accent-glow);
 }
 .btn-primary:hover { filter: brightness(1.08); }
 .btn-ghost { background: var(--surface-2); color: var(--text); border-color: var(--border); }
