@@ -7,13 +7,27 @@ import logging
 from sqlalchemy.orm import Session
 
 from ..clients import get_media_client
-from ..models import Marathon, MediaServer
+from ..models import Marathon, MarathonItem, MediaServer
 
 log = logging.getLogger("bingearr.builder")
 
 
 class PushError(Exception):
     """Raised when a marathon cannot be pushed to its media server."""
+
+
+def replace_items_from_media(marathon: Marathon, media_items) -> None:
+    """Replace a marathon's items from a list of resolved ``MediaItem`` objects."""
+    marathon.items.clear()
+    for pos, mi in enumerate(media_items):
+        marathon.items.append(
+            MarathonItem(
+                position=pos,
+                server_item_id=mi.id,
+                title=mi.title,
+                runtime_minutes=mi.runtime_minutes,
+            )
+        )
 
 
 def push_marathon(db: Session, marathon: Marathon) -> dict:

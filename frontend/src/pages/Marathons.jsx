@@ -6,12 +6,25 @@ import {
   ArrowRight,
   Trash2,
   UploadCloud,
+  RefreshCw,
   Pencil,
   CheckCircle2,
+  Clock,
 } from "lucide-react";
 import { Card, Button, EmptyState, Spinner, isAuthError, formatRuntime } from "../ui.jsx";
 import { api, getApiKey } from "../api.js";
 import Builder from "./Builder.jsx";
+
+const WEEKDAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+
+function formatSchedule(s) {
+  if (!s || s.frequency === "off") return null;
+  if (s.frequency === "hourly") return "Hourly";
+  if (s.frequency === "daily") return `Daily ${s.time || ""}`.trim();
+  if (s.frequency === "weekly")
+    return `Weekly ${WEEKDAYS[s.weekday ?? 0]} ${s.time || ""}`.trim();
+  return null;
+}
 
 export default function Marathons({ setPage }) {
   const [view, setView] = useState({ mode: "list" });
@@ -83,6 +96,22 @@ export default function Marathons({ setPage }) {
       .finally(() => setPushing((p) => ({ ...p, [id]: false })));
   }
 
+  function rebuild(id) {
+    setPushing((p) => ({ ...p, [id]: true }));
+    setFlash(null);
+    api
+      .rebuildMarathon(id)
+      .then((r) => {
+        setFlash({
+          ok: true,
+          msg: `Rebuilt from its recipe and pushed ${r.item_count} titles to Plex.`,
+        });
+        load();
+      })
+      .catch((e) => setFlash({ ok: false, msg: e.message }))
+      .finally(() => setPushing((p) => ({ ...p, [id]: false })));
+  }
+
   function remove(id) {
     api.deleteMarathon(id).then(load).catch((e) => setFlash({ ok: false, msg: e.message }));
   }
@@ -112,6 +141,7 @@ export default function Marathons({ setPage }) {
               <th>Name</th>
               <th>Titles</th>
               <th>Runtime</th>
+              <th>Schedule</th>
               <th>Status</th>
               <th className="right">Actions</th>
             </tr>
@@ -122,6 +152,15 @@ export default function Marathons({ setPage }) {
                 <td>{m.name}</td>
                 <td>{m.item_count}</td>
                 <td className="muted">{formatRuntime(m.total_runtime_minutes)}</td>
+                <td className="muted">
+                  {formatSchedule(m.schedule) ? (
+                    <span className="test-line">
+                      <Clock size={13} /> {formatSchedule(m.schedule)}
+                    </span>
+                  ) : (
+                    "—"
+                  )}
+                </td>
                 <td>
                   {m.server_playlist_id ? (
                     <span className="test-line ok">
@@ -140,15 +179,28 @@ export default function Marathons({ setPage }) {
                   >
                     Edit
                   </Button>{" "}
-                  <Button
-                    variant="primary"
-                    size="sm"
-                    icon={pushing[m.id] ? undefined : UploadCloud}
-                    onClick={() => push(m.id)}
-                    disabled={pushing[m.id] || m.item_count === 0}
-                  >
-                    {pushing[m.id] ? <Spinner /> : m.server_playlist_id ? "Re-push" : "Push to Plex"}
-                  </Button>{" "}
+                  {m.rule_config ? (
+                    <Button
+                      variant="primary"
+                      size="sm"
+                      icon={pushing[m.id] ? undefined : RefreshCw}
+                      onClick={() => rebuild(m.id)}
+                      disabled={pushing[m.id]}
+                      title="Re-resolve the recipe and push"
+                    >
+                      {pushing[m.id] ? <Spinner /> : "Run now"}
+                    </Button>
+                  ) : (
+                    <Button
+                      variant="primary"
+                      size="sm"
+                      icon={pushing[m.id] ? undefined : UploadCloud}
+                      onClick={() => push(m.id)}
+                      disabled={pushing[m.id] || m.item_count === 0}
+                    >
+                      {pushing[m.id] ? <Spinner /> : m.server_playlist_id ? "Re-push" : "Push to Plex"}
+                    </Button>
+                  )}{" "}
                   <Button
                     variant="danger"
                     size="sm"

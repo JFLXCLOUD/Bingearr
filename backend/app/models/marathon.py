@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
-from sqlalchemy import ForeignKey, Integer, String, Text
+from datetime import datetime
+
+from sqlalchemy import DateTime, ForeignKey, Integer, String, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from ..db.database import Base
@@ -31,7 +33,11 @@ class Marathon(TimestampMixin, Base):
 
     target_kind: Mapped[str] = mapped_column(String(16), default="playlist")  # playlist|collection
     server_playlist_id: Mapped[str | None] = mapped_column(String(128), nullable=True)
+
+    # Recurrence config (JSON) + run bookkeeping for the background scheduler.
     schedule: Mapped[str | None] = mapped_column(Text, nullable=True)
+    last_run_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    next_run_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
 
     items: Mapped[list["MarathonItem"]] = relationship(
         back_populates="marathon",

@@ -44,9 +44,24 @@ def _m001_initial(conn: Connection) -> None:
     Base.metadata.create_all(bind=conn)
 
 
+def _columns(conn: Connection, table: str) -> set[str]:
+    rows = conn.execute(text(f"PRAGMA table_info({table})")).fetchall()
+    return {row[1] for row in rows}
+
+
+def _m002_schedule_columns(conn: Connection) -> None:
+    # Idempotent: a fresh DB already has these from create_all (migration 1);
+    # an existing DB gets them added here.
+    existing = _columns(conn, "marathons")
+    for col in ("last_run_at", "next_run_at"):
+        if col not in existing:
+            conn.execute(text(f"ALTER TABLE marathons ADD COLUMN {col} DATETIME"))
+
+
 # (version, name, fn). Append new entries; never renumber existing ones.
 MIGRATIONS = [
     (1, "initial schema", _m001_initial),
+    (2, "marathon schedule bookkeeping columns", _m002_schedule_columns),
 ]
 
 

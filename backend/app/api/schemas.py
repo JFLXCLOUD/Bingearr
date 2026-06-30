@@ -86,6 +86,12 @@ class MarathonItemOut(BaseModel):
     watched: bool
 
 
+class ScheduleConfig(BaseModel):
+    frequency: Literal["off", "hourly", "daily", "weekly"] = "off"
+    time: Optional[str] = None  # "HH:MM" for daily/weekly (server local time)
+    weekday: Optional[int] = None  # 0=Mon .. 6=Sun for weekly
+
+
 class MarathonCreate(BaseModel):
     name: str
     description: Optional[str] = None
@@ -95,6 +101,9 @@ class MarathonCreate(BaseModel):
     watch_filter: Literal["all", "unwatched", "in_progress"] = "all"
     target_kind: Literal["playlist", "collection"] = "playlist"
     items: list[MarathonItemIn] = []
+    # Recipe for rule/smart marathons (re-resolved on scheduled rebuilds).
+    rule_config: Optional[dict] = None
+    schedule: Optional[ScheduleConfig] = None
 
 
 class MarathonUpdate(BaseModel):
@@ -102,6 +111,8 @@ class MarathonUpdate(BaseModel):
     description: Optional[str] = None
     # When provided, fully replaces the ordered item list.
     items: Optional[list[MarathonItemIn]] = None
+    rule_config: Optional[dict] = None
+    schedule: Optional[ScheduleConfig] = None
 
 
 class MarathonRead(BaseModel):
@@ -118,6 +129,10 @@ class MarathonRead(BaseModel):
     server_playlist_id: Optional[str] = None
     item_count: int = 0
     total_runtime_minutes: int = 0
+    rule_config: Optional[dict] = None
+    schedule: Optional[dict] = None
+    last_run_at: Optional[datetime] = None
+    next_run_at: Optional[datetime] = None
     created_at: datetime
     updated_at: datetime
 

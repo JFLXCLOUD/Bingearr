@@ -41,6 +41,10 @@ export default function Builder({ marathonId, onClose }) {
   const [minutes, setMinutes] = useState(240);
   const [generating, setGenerating] = useState(false);
 
+  // Recipe (for scheduled re-resolution) + schedule config.
+  const [recipe, setRecipe] = useState(null);
+  const [schedule, setSchedule] = useState({ frequency: "off", time: "03:00", weekday: 0 });
+
   const [selected, setSelected] = useState([]);
   const [name, setName] = useState("");
   const [error, setError] = useState("");
@@ -75,6 +79,14 @@ export default function Builder({ marathonId, onClose }) {
             runtime_minutes: i.runtime_minutes,
           }))
         );
+        if (m.rule_config) setRecipe(m.rule_config);
+        if (m.schedule) {
+          setSchedule({
+            frequency: m.schedule.frequency || "off",
+            time: m.schedule.time || "03:00",
+            weekday: m.schedule.weekday ?? 0,
+          });
+        }
       })
       .catch((e) => setError(e.message));
   }, [marathonId]);
@@ -158,14 +170,26 @@ export default function Builder({ marathonId, onClose }) {
     });
   }
 
+  // A manual single add breaks any recipe correspondence.
+  function addManual(it) {
+    appendItems([it]);
+    setRecipe(null);
+  }
+
   async function addSeries(show) {
     setBusy(show.id);
     setError("");
+    const wasEmpty = selected.length === 0;
     try {
       const eps = await api.expandShow(serverId, show.id, {
         unwatched_only: unwatchedOnly || undefined,
       });
       appendItems(eps);
+      setRecipe(
+        wasEmpty
+          ? { kind: "series", show_id: show.id, unwatched_only: unwatchedOnly }
+          : null
+      );
     } catch (e) {
       setError(e.message);
     }
@@ -175,9 +199,11 @@ export default function Builder({ marathonId, onClose }) {
   async function addCollection(col) {
     setBusy(col.id);
     setError("");
+    const wasEmpty = selected.length === 0;
     try {
       const items = await api.expandCollection(serverId, col.id);
       appendItems(items);
+      setRecipe(wasEmpty ? { kind: "collection", collection_id: col.id } : null);
     } catch (e) {
       setError(e.message);
     }
@@ -203,6 +229,7 @@ export default function Builder({ marathonId, onClose }) {
           runtime_minutes: i.runtime_minutes,
         }))
       );
+      setRecipe({ kind: "smart", library_key: libraryKey, genre, watch, minutes });
     } catch (e) {
       setError(e.message);
     }
@@ -211,6 +238,7 @@ export default function Builder({ marathonId, onClose }) {
 
   function removeAt(idx) {
     setSelected(selected.filter((_, i) => i !== idx));
+    setRecipe(null);
   }
   function move(idx, dir) {
     const j = idx + dir;
@@ -218,6 +246,7 @@ export default function Builder({ marathonId, onClose }) {
     const copy = [...selected];
     [copy[idx], copy[j]] = [copy[j], copy[idx]];
     setSelected(copy);
+    setRecipe(null);
   }
 
   const totalRuntime = selected.reduce((a, s) => a + (s.runtime_minutes || 0), 0);
@@ -227,14 +256,21 @@ export default function Builder({ marathonId, onClose }) {
     if (!canSave) return;
     setSaving(true);
     setError("");
+    const scheduleOut = schedule.frequency === "off" ? { frequency: "off" } : schedule;
     const action = marathonId
-      ? api.updateMarathon(marathonId, { name: name.trim(), items: selected })
+      ? api.updateMarathon(marathonId, {
+          name: name.trim(),
+          items: selected,
+          rule_config: recipe,
+          schedule: scheduleOut,
+        })
       : api.createMarathon({
           name: name.trim(),
           server_id: serverId,
-          type: "manual",
           target_kind: "playlist",
           items: selected,
+          rule_config: recipe,
+          schedule: scheduleOut,
         });
     action
       .then(() => onClose(true))
@@ -364,7 +400,7 @@ export default function Builder({ marathonId, onClose }) {
                             <Check size={14} /> Added
                           </span>
                         ) : (
-                          <button className="icon-btn" onClick={() => appendItems([it])} title="Add">
+                          <button className="icon-btn" onClick={() => addManual(it)} title="Add">
                             <Plus size={16} />
                           </button>
                         )}
@@ -512,6 +548,53 @@ export default function Builder({ marathonId, onClose }) {
           )}
         </Card>
       </div>
+
+      <Card
+        title="Automatic rebuild"
+        sub="Refresh this marathon on a schedule and re-push to Plex."
+      >
+        <div className="row">
+          <Field label="Frequency">
+            <select
+              value={schedule.frequency}
+              onChange={(e) => setSchedule({ ...schedule, frequency: e.target.value })}
+            >
+              <option value="off">Off</option>
+              <option value="hourly">Hourly</option>
+              <option value="daily">Daily</option>
+              <option value="weekly">Weekly</option>
+            </select>
+          </Field>
+          {(schedule.frequency === "daily" || schedule.frequency === "weekly") && (
+            <Field label="Time">
+              <input
+                type="time"
+                value={schedule.time}
+                onChange={(e) => setSchedule({ ...schedule, time: e.target.value })}
+              />
+            </Field>
+          )}
+          {schedule.frequency === "weekly" && (
+            <Field label="Day">
+              <select
+                value={schedule.weekday}
+                onChange={(e) => setSchedule({ ...schedule, weekday: Number(e.target.value) })}
+              >
+                {["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"].map((d, i) => (
+                  <option key={i} value={i}>
+                    {d}
+                  </option>
+                ))}
+              </select>
+            </Field>
+          )}
+        </div>
+        <p className="row-meta" style={{ marginTop: 6 }}>
+          {recipe
+            ? "This marathon has a recipe — scheduled runs re-resolve fresh contents (e.g. tonight's unwatched picks) and re-push to Plex."
+            : "This is a fixed list — scheduled runs just re-sync the same playlist to Plex."}
+        </p>
+      </Card>
     </>
   );
 }

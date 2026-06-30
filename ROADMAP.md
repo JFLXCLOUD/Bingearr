@@ -138,11 +138,12 @@ Bingearr belongs in the ecosystem.
 - [x] Push marathon to Plex as a **native playlist**
 - [x] Persist marathons; edit/rebuild/delete
 
-### Phase 2 — Smart builder (in progress)
+### Phase 2 — Smart builder ✅ (actor/director + skip-filler later)
 - [x] Time-boxed builder (runtime budget) — greedy pack to fit a minute budget
 - [x] Watch-state filters — unwatched + continue-watching (skip-filler later)
 - [x] Genre rule (server-side genre filter) — actor/director rules later
-- [ ] Optional scheduling (NeXroll-style recurrence)
+- [x] Scheduling — recurrence (hourly/daily/weekly) + background loop that
+      re-resolves recipe marathons and re-pushes to Plex; manual "Run now"
 
 ### Phase 3 — NeXroll prerolls
 - [ ] Add the NeXroll integration API (above) on the NeXroll side

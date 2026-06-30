@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import logging
 from contextlib import asynccontextmanager
 from pathlib import Path
@@ -14,6 +15,7 @@ from . import __version__
 from .config import settings
 from .db.migrations import run_migrations
 from .security import init_api_key
+from .services.scheduler import run_due_schedules
 from .api.routes import health, marathons, servers
 
 logging.basicConfig(
@@ -21,6 +23,18 @@ logging.basicConfig(
     format="%(asctime)s %(levelname)s %(name)s: %(message)s",
 )
 log = logging.getLogger("bingearr")
+
+
+async def scheduler_loop():
+    """Tick once a minute, running any marathons whose schedule is due."""
+    while True:
+        try:
+            ran = await asyncio.to_thread(run_due_schedules)
+            if ran:
+                log.info("Scheduler ran %d marathon(s)", ran)
+        except Exception:  # noqa: BLE001 — a bad tick must not kill the loop
+            log.exception("Scheduler tick failed")
+        await asyncio.sleep(60)
 
 
 @asynccontextmanager
@@ -31,7 +45,11 @@ async def lifespan(app: FastAPI):
         # Only surface the key when we generated it (not when env-pinned).
         log.info("API key: %s", key)
     log.info("Bingearr %s ready on %s:%s", __version__, settings.host, settings.port)
-    yield
+    scheduler = asyncio.create_task(scheduler_loop())
+    try:
+        yield
+    finally:
+        scheduler.cancel()
 
 
 app = FastAPI(title="Bingearr", version=__version__, lifespan=lifespan)

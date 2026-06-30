@@ -64,4 +64,5 @@ export const api = {
     req(`/api/marathons/${id}`, { method: "PUT", body: JSON.stringify(body) }),
   deleteMarathon: (id) => req(`/api/marathons/${id}`, { method: "DELETE" }),
   pushMarathon: (id) => req(`/api/marathons/${id}/push`, { method: "POST" }),
+  rebuildMarathon: (id) => req(`/api/marathons/${id}/rebuild`, { method: "POST" }),
 };
