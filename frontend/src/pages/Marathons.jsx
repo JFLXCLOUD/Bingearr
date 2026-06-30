@@ -10,6 +10,7 @@ import {
   Pencil,
   CheckCircle2,
   Clock,
+  Film,
 } from "lucide-react";
 import { Card, Button, EmptyState, Spinner, isAuthError, formatRuntime } from "../ui.jsx";
 import { api, getApiKey } from "../api.js";
@@ -149,7 +150,14 @@ export default function Marathons({ setPage }) {
           <tbody>
             {marathons.map((m) => (
               <tr key={m.id}>
-                <td>{m.name}</td>
+                <td>
+                  {m.name}
+                  {m.preroll && (
+                    <span className="row-tag" title="NeXroll preroll">
+                      <Film size={10} /> {m.preroll.name || "preroll"}
+                    </span>
+                  )}
+                </td>
                 <td>{m.item_count}</td>
                 <td className="muted">{formatRuntime(m.total_runtime_minutes)}</td>
                 <td className="muted">

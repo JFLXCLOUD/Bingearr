@@ -481,6 +481,10 @@ input:focus, select:focus {
 }
 .check input { width: auto; }
 .row-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  vertical-align: middle;
   font-size: 11px;
   color: var(--accent-2);
   background: var(--accent-soft);

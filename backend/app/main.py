@@ -16,7 +16,7 @@ from .config import settings
 from .db.migrations import run_migrations
 from .security import init_api_key
 from .services.scheduler import run_due_schedules
-from .api.routes import health, marathons, servers
+from .api.routes import health, marathons, nexroll, servers
 
 logging.basicConfig(
     level=logging.INFO,
@@ -64,6 +64,7 @@ app.add_middleware(
 app.include_router(health.router)
 app.include_router(servers.router)
 app.include_router(marathons.router)
+app.include_router(nexroll.router)
 
 # Serve the built React app if present (single-container deploy). In dev the
 # Vite server runs separately and proxies /api here, so this stays unmounted.

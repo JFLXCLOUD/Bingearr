@@ -65,4 +65,13 @@ export const api = {
   deleteMarathon: (id) => req(`/api/marathons/${id}`, { method: "DELETE" }),
   pushMarathon: (id) => req(`/api/marathons/${id}/push`, { method: "POST" }),
   rebuildMarathon: (id) => req(`/api/marathons/${id}/rebuild`, { method: "POST" }),
+  applyPreroll: (id) => req(`/api/marathons/${id}/preroll/apply`, { method: "POST" }),
+  clearPreroll: (id) => req(`/api/marathons/${id}/preroll/clear`, { method: "POST" }),
+
+  // NeXroll
+  listNexroll: () => req("/api/nexroll"),
+  createNexroll: (body) => req("/api/nexroll", { method: "POST", body: JSON.stringify(body) }),
+  deleteNexroll: (id) => req(`/api/nexroll/${id}`, { method: "DELETE" }),
+  nexrollStatus: (id) => req(`/api/nexroll/${id}/status`),
+  nexrollPrerolls: (id) => req(`/api/nexroll/${id}/prerolls`),
 };

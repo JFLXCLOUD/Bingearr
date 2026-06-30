@@ -45,6 +45,12 @@ export default function Builder({ marathonId, onClose }) {
   const [recipe, setRecipe] = useState(null);
   const [schedule, setSchedule] = useState({ frequency: "off", time: "03:00", weekday: 0 });
 
+  // NeXroll preroll
+  const [nexrollConn, setNexrollConn] = useState(null);
+  const [prerolls, setPrerolls] = useState([]);
+  const [preroll, setPreroll] = useState(null);
+  const [prerollMsg, setPrerollMsg] = useState(null);
+
   const [selected, setSelected] = useState([]);
   const [name, setName] = useState("");
   const [error, setError] = useState("");
@@ -63,6 +69,18 @@ export default function Builder({ marathonId, onClose }) {
       })
       .catch((e) => setError(e.message));
   }, [marathonId]);
+
+  // NeXroll connection + available prerolls
+  useEffect(() => {
+    api
+      .listNexroll()
+      .then((list) => {
+        const c = list[0] || null;
+        setNexrollConn(c);
+        if (c) api.nexrollPrerolls(c.id).then(setPrerolls).catch(() => setPrerolls([]));
+      })
+      .catch(() => {});
+  }, []);
 
   // Existing marathon (edit mode)
   useEffect(() => {
@@ -87,6 +105,7 @@ export default function Builder({ marathonId, onClose }) {
             weekday: m.schedule.weekday ?? 0,
           });
         }
+        if (m.preroll) setPreroll(m.preroll);
       })
       .catch((e) => setError(e.message));
   }, [marathonId]);
@@ -249,6 +268,27 @@ export default function Builder({ marathonId, onClose }) {
     setRecipe(null);
   }
 
+  async function applyPrerollNow() {
+    setPrerollMsg(null);
+    try {
+      await api.updateMarathon(marathonId, { preroll }); // persist current choice first
+      const r = await api.applyPreroll(marathonId);
+      setPrerollMsg({ ok: true, text: r.message || "Preroll applied." });
+    } catch (e) {
+      setPrerollMsg({ ok: false, text: e.message });
+    }
+  }
+
+  async function clearPrerollNow() {
+    setPrerollMsg(null);
+    try {
+      const r = await api.clearPreroll(marathonId);
+      setPrerollMsg({ ok: true, text: r.message || "Reverted to NeXroll's schedule." });
+    } catch (e) {
+      setPrerollMsg({ ok: false, text: e.message });
+    }
+  }
+
   const totalRuntime = selected.reduce((a, s) => a + (s.runtime_minutes || 0), 0);
   const canSave = name.trim() && selected.length > 0 && serverId;
 
@@ -263,6 +303,7 @@ export default function Builder({ marathonId, onClose }) {
           items: selected,
           rule_config: recipe,
           schedule: scheduleOut,
+          preroll,
         })
       : api.createMarathon({
           name: name.trim(),
@@ -271,6 +312,7 @@ export default function Builder({ marathonId, onClose }) {
           items: selected,
           rule_config: recipe,
           schedule: scheduleOut,
+          preroll,
         });
     action
       .then(() => onClose(true))
@@ -549,52 +591,103 @@ export default function Builder({ marathonId, onClose }) {
         </Card>
       </div>
 
-      <Card
-        title="Automatic rebuild"
-        sub="Refresh this marathon on a schedule and re-push to Plex."
-      >
-        <div className="row">
-          <Field label="Frequency">
-            <select
-              value={schedule.frequency}
-              onChange={(e) => setSchedule({ ...schedule, frequency: e.target.value })}
-            >
-              <option value="off">Off</option>
-              <option value="hourly">Hourly</option>
-              <option value="daily">Daily</option>
-              <option value="weekly">Weekly</option>
-            </select>
-          </Field>
-          {(schedule.frequency === "daily" || schedule.frequency === "weekly") && (
-            <Field label="Time">
-              <input
-                type="time"
-                value={schedule.time}
-                onChange={(e) => setSchedule({ ...schedule, time: e.target.value })}
-              />
-            </Field>
-          )}
-          {schedule.frequency === "weekly" && (
-            <Field label="Day">
+      <div className="grid grid-2">
+        <Card
+          title="Automatic rebuild"
+          sub="Refresh this marathon on a schedule and re-push to Plex."
+        >
+          <div className="row">
+            <Field label="Frequency">
               <select
-                value={schedule.weekday}
-                onChange={(e) => setSchedule({ ...schedule, weekday: Number(e.target.value) })}
+                value={schedule.frequency}
+                onChange={(e) => setSchedule({ ...schedule, frequency: e.target.value })}
               >
-                {["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"].map((d, i) => (
-                  <option key={i} value={i}>
-                    {d}
-                  </option>
-                ))}
+                <option value="off">Off</option>
+                <option value="hourly">Hourly</option>
+                <option value="daily">Daily</option>
+                <option value="weekly">Weekly</option>
               </select>
             </Field>
+            {(schedule.frequency === "daily" || schedule.frequency === "weekly") && (
+              <Field label="Time">
+                <input
+                  type="time"
+                  value={schedule.time}
+                  onChange={(e) => setSchedule({ ...schedule, time: e.target.value })}
+                />
+              </Field>
+            )}
+            {schedule.frequency === "weekly" && (
+              <Field label="Day">
+                <select
+                  value={schedule.weekday}
+                  onChange={(e) => setSchedule({ ...schedule, weekday: Number(e.target.value) })}
+                >
+                  {["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"].map((d, i) => (
+                    <option key={i} value={i}>
+                      {d}
+                    </option>
+                  ))}
+                </select>
+              </Field>
+            )}
+          </div>
+          <p className="row-meta" style={{ marginTop: 6 }}>
+            {recipe
+              ? "This marathon has a recipe — scheduled runs re-resolve fresh contents and re-push to Plex."
+              : "This is a fixed list — scheduled runs just re-sync the same playlist to Plex."}
+          </p>
+        </Card>
+
+        <Card title="Preroll" sub="Play a NeXroll preroll when this marathon is activated.">
+          {nexrollConn ? (
+            <>
+              <Field label="NeXroll preroll">
+                <select
+                  value={preroll ? `${preroll.type}:${preroll.id}` : ""}
+                  onChange={(e) => {
+                    const v = e.target.value;
+                    const p = prerolls.find((x) => `${x.type}:${x.id}` === v);
+                    setPreroll(p ? { id: p.id, type: p.type, name: p.name } : null);
+                    setPrerollMsg(null);
+                  }}
+                >
+                  <option value="">None</option>
+                  {prerolls.map((p) => (
+                    <option key={`${p.type}:${p.id}`} value={`${p.type}:${p.id}`}>
+                      {p.name} ({p.type})
+                    </option>
+                  ))}
+                </select>
+              </Field>
+              {marathonId && preroll ? (
+                <div className="row" style={{ marginTop: 2 }}>
+                  <Button variant="ghost" size="sm" icon={Film} onClick={applyPrerollNow}>
+                    Apply now
+                  </Button>
+                  <Button variant="subtle" size="sm" onClick={clearPrerollNow}>
+                    Clear
+                  </Button>
+                </div>
+              ) : (
+                <p className="row-meta" style={{ marginTop: 6 }}>
+                  {preroll ? "Save the marathon, then apply its preroll." : "No preroll attached."}
+                </p>
+              )}
+              {prerollMsg && (
+                <p
+                  className="row-meta"
+                  style={{ marginTop: 10, color: prerollMsg.ok ? "var(--ok)" : "var(--bad)" }}
+                >
+                  {prerollMsg.text}
+                </p>
+              )}
+            </>
+          ) : (
+            <p className="row-meta">Connect NeXroll in Settings to attach a preroll.</p>
           )}
-        </div>
-        <p className="row-meta" style={{ marginTop: 6 }}>
-          {recipe
-            ? "This marathon has a recipe — scheduled runs re-resolve fresh contents (e.g. tonight's unwatched picks) and re-push to Plex."
-            : "This is a fixed list — scheduled runs just re-sync the same playlist to Plex."}
-        </p>
-      </Card>
+        </Card>
+      </div>
     </>
   );
 }

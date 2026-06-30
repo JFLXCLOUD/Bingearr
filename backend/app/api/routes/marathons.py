@@ -9,12 +9,15 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from ...clients.nexroll import NeXrollClient
+from ...config import settings
 from ...db.database import get_session
-from ...models import Marathon, MarathonItem
+from ...models import Marathon, MarathonItem, MediaServer, NeXrollConnection
 from ...services.builder import PushError, push_marathon
 from ...services.scheduler import compute_next_run, rebuild_and_push
 from ..deps import require_api_key
 from ..schemas import (
+    ApplyResult,
     MarathonCreate,
     MarathonDetail,
     MarathonItemIn,
@@ -60,11 +63,16 @@ def _read(marathon: Marathon) -> MarathonRead:
         total_runtime_minutes=sum(i.runtime_minutes or 0 for i in marathon.items),
         rule_config=json.loads(marathon.rule_config) if marathon.rule_config else None,
         schedule=json.loads(marathon.schedule) if marathon.schedule else None,
+        preroll=json.loads(marathon.preroll_ref) if marathon.preroll_ref else None,
         last_run_at=marathon.last_run_at,
         next_run_at=marathon.next_run_at,
         created_at=marathon.created_at,
         updated_at=marathon.updated_at,
     )
+
+
+def _apply_preroll_ref(marathon: Marathon, preroll: dict | None) -> None:
+    marathon.preroll_ref = json.dumps(preroll) if preroll else None
 
 
 def _apply_recipe(marathon: Marathon, rule_config: dict | None) -> None:
@@ -122,6 +130,7 @@ def create_marathon(body: MarathonCreate, db: Session = Depends(get_session)) ->
     _set_items(marathon, body.items)
     _apply_recipe(marathon, body.rule_config)
     _apply_schedule(marathon, body.schedule)
+    _apply_preroll_ref(marathon, body.preroll)
     db.add(marathon)
     db.commit()
     db.refresh(marathon)
@@ -149,6 +158,8 @@ def update_marathon(
         _apply_recipe(marathon, body.rule_config)
     if "schedule" in provided:
         _apply_schedule(marathon, body.schedule)
+    if "preroll" in provided:
+        _apply_preroll_ref(marathon, body.preroll)
     db.commit()
     db.refresh(marathon)
     return _detail(marathon)
@@ -180,3 +191,53 @@ def rebuild(marathon_id: int, db: Session = Depends(get_session)) -> PushResult:
     except PushError as exc:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc))
     return PushResult(**result)
+
+
+def _first_nexroll(db: Session) -> NeXrollConnection:
+    conn = db.scalars(
+        select(NeXrollConnection)
+        .where(NeXrollConnection.enabled.is_(True))
+        .order_by(NeXrollConnection.id)
+    ).first()
+    if conn is None:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="No NeXroll connection is configured.",
+        )
+    return conn
+
+
+@router.post("/{marathon_id}/preroll/apply", response_model=ApplyResult)
+def apply_preroll(marathon_id: int, db: Session = Depends(get_session)) -> ApplyResult:
+    """Apply this marathon's attached preroll via NeXroll (on activation)."""
+    marathon = _get_or_404(db, marathon_id)
+    if not marathon.preroll_ref:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail="No preroll attached to this marathon."
+        )
+    preroll = json.loads(marathon.preroll_ref)
+    conn = _first_nexroll(db)
+    server_name = None
+    if marathon.server_id:
+        server = db.get(MediaServer, marathon.server_id)
+        server_name = server.name if server else None
+    ref = f"{preroll['type']}:{preroll['id']}"
+    client = NeXrollClient(conn.base_url, conn.api_key, timeout=settings.plex_timeout)
+    try:
+        res = client.apply(ref, server_name)
+    except Exception as exc:  # noqa: BLE001 — normalize NeXroll/transport errors
+        raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=str(exc))
+    return ApplyResult(applied=bool(res.get("applied", True)), message=res.get("message"))
+
+
+@router.post("/{marathon_id}/preroll/clear", response_model=ApplyResult)
+def clear_preroll(marathon_id: int, db: Session = Depends(get_session)) -> ApplyResult:
+    """Revert NeXroll to its normal schedule (on teardown)."""
+    _get_or_404(db, marathon_id)
+    conn = _first_nexroll(db)
+    client = NeXrollClient(conn.base_url, conn.api_key, timeout=settings.plex_timeout)
+    try:
+        res = client.clear()
+    except Exception as exc:  # noqa: BLE001
+        raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=str(exc))
+    return ApplyResult(applied=bool(res.get("applied", False)), message=res.get("message"))

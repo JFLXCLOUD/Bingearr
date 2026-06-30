@@ -104,6 +104,8 @@ class MarathonCreate(BaseModel):
     # Recipe for rule/smart marathons (re-resolved on scheduled rebuilds).
     rule_config: Optional[dict] = None
     schedule: Optional[ScheduleConfig] = None
+    # NeXroll preroll to apply when this marathon is activated.
+    preroll: Optional[dict] = None
 
 
 class MarathonUpdate(BaseModel):
@@ -113,6 +115,7 @@ class MarathonUpdate(BaseModel):
     items: Optional[list[MarathonItemIn]] = None
     rule_config: Optional[dict] = None
     schedule: Optional[ScheduleConfig] = None
+    preroll: Optional[dict] = None
 
 
 class MarathonRead(BaseModel):
@@ -131,6 +134,7 @@ class MarathonRead(BaseModel):
     total_runtime_minutes: int = 0
     rule_config: Optional[dict] = None
     schedule: Optional[dict] = None
+    preroll: Optional[dict] = None
     last_run_at: Optional[datetime] = None
     next_run_at: Optional[datetime] = None
     created_at: datetime
@@ -152,3 +156,51 @@ class HealthOut(BaseModel):
     status: str
     app: str
     version: str
+
+
+# --- NeXroll integration ---------------------------------------------------
+class NeXrollCreate(BaseModel):
+    base_url: str
+    api_key: str
+    enabled: bool = True
+
+
+class NeXrollUpdate(BaseModel):
+    base_url: Optional[str] = None
+    api_key: Optional[str] = None
+    enabled: Optional[bool] = None
+
+
+class NeXrollRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    base_url: str
+    enabled: bool
+    created_at: datetime
+    updated_at: datetime
+    # api_key is never serialized back out.
+
+
+class NeXrollStatus(BaseModel):
+    ok: bool
+    version: Optional[str] = None
+    server_connected: Optional[bool] = None
+    message: Optional[str] = None
+
+
+class PrerollOut(BaseModel):
+    id: str
+    name: str
+    type: str  # category | sequence
+
+
+class PrerollRef(BaseModel):
+    id: str
+    type: str
+    name: Optional[str] = None
+
+
+class ApplyResult(BaseModel):
+    applied: bool
+    message: Optional[str] = None
