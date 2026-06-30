@@ -1,0 +1,308 @@
+import { useEffect, useState } from "react";
+import {
+  ArrowLeft,
+  Search,
+  Plus,
+  Check,
+  ChevronUp,
+  ChevronDown,
+  X,
+  Save,
+  Film,
+  ListVideo,
+} from "lucide-react";
+import { Card, Button, EmptyState, Spinner, formatRuntime } from "../ui.jsx";
+import { api } from "../api.js";
+
+const PAGE = 50;
+
+export default function Builder({ marathonId, onClose }) {
+  const [servers, setServers] = useState([]);
+  const [serverId, setServerId] = useState(null);
+  const [libraries, setLibraries] = useState([]);
+  const [libraryKey, setLibraryKey] = useState(null);
+
+  const [search, setSearch] = useState("");
+  const [results, setResults] = useState([]);
+  const [offset, setOffset] = useState(0);
+  const [hasMore, setHasMore] = useState(false);
+  const [loading, setLoading] = useState(false);
+
+  const [selected, setSelected] = useState([]);
+  const [name, setName] = useState("");
+  const [error, setError] = useState("");
+  const [saving, setSaving] = useState(false);
+
+  // Servers
+  useEffect(() => {
+    api
+      .listServers()
+      .then((s) => {
+        setServers(s);
+        if (s[0] && !marathonId) setServerId(s[0].id);
+      })
+      .catch((e) => setError(e.message));
+  }, [marathonId]);
+
+  // Existing marathon (edit mode)
+  useEffect(() => {
+    if (!marathonId) return;
+    api
+      .getMarathon(marathonId)
+      .then((m) => {
+        setName(m.name);
+        if (m.server_id) setServerId(m.server_id);
+        setSelected(
+          m.items.map((i) => ({
+            server_item_id: i.server_item_id,
+            title: i.title,
+            runtime_minutes: i.runtime_minutes,
+          }))
+        );
+      })
+      .catch((e) => setError(e.message));
+  }, [marathonId]);
+
+  // Libraries when the server changes
+  useEffect(() => {
+    if (!serverId) return;
+    setLibraries([]);
+    setLibraryKey(null);
+    api
+      .listLibraries(serverId)
+      .then((libs) => {
+        setLibraries(libs);
+        const first = libs.find((l) => l.type === "movie") || libs[0];
+        if (first) setLibraryKey(first.key);
+      })
+      .catch((e) => setError(e.message));
+  }, [serverId]);
+
+  // Items when the library changes
+  useEffect(() => {
+    if (serverId && libraryKey) loadItems(0, true);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [serverId, libraryKey]);
+
+  function loadItems(off, reset) {
+    setLoading(true);
+    setError("");
+    api
+      .listItems(serverId, libraryKey, { search: search || undefined, limit: PAGE, offset: off })
+      .then((items) => {
+        setResults((prev) => (reset ? items : [...prev, ...items]));
+        setOffset(off + items.length);
+        setHasMore(items.length === PAGE);
+      })
+      .catch((e) => setError(e.message))
+      .finally(() => setLoading(false));
+  }
+
+  function runSearch(e) {
+    e.preventDefault();
+    loadItems(0, true);
+  }
+
+  const selectedIds = new Set(selected.map((s) => s.server_item_id));
+
+  function add(it) {
+    if (selectedIds.has(it.id)) return;
+    setSelected([
+      ...selected,
+      { server_item_id: it.id, title: it.title, runtime_minutes: it.runtime_minutes },
+    ]);
+  }
+  function removeAt(idx) {
+    setSelected(selected.filter((_, i) => i !== idx));
+  }
+  function move(idx, dir) {
+    const j = idx + dir;
+    if (j < 0 || j >= selected.length) return;
+    const copy = [...selected];
+    [copy[idx], copy[j]] = [copy[j], copy[idx]];
+    setSelected(copy);
+  }
+
+  const totalRuntime = selected.reduce((a, s) => a + (s.runtime_minutes || 0), 0);
+  const canSave = name.trim() && selected.length > 0 && serverId;
+
+  function save() {
+    if (!canSave) return;
+    setSaving(true);
+    setError("");
+    const action = marathonId
+      ? api.updateMarathon(marathonId, { name: name.trim(), items: selected })
+      : api.createMarathon({
+          name: name.trim(),
+          server_id: serverId,
+          type: "manual",
+          target_kind: "playlist",
+          items: selected,
+        });
+    action
+      .then(() => onClose(true))
+      .catch((e) => {
+        setError(e.message);
+        setSaving(false);
+      });
+  }
+
+  return (
+    <>
+      <div className="builder-head">
+        <div className="left">
+          <button className="icon-btn" onClick={() => onClose(false)} title="Back">
+            <ArrowLeft size={16} />
+          </button>
+          <input
+            className="title-input"
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            placeholder="Marathon name…"
+          />
+        </div>
+        <Button icon={saving ? undefined : Save} onClick={save} disabled={!canSave || saving}>
+          {saving ? <Spinner /> : marathonId ? "Save changes" : "Save marathon"}
+        </Button>
+      </div>
+
+      {error && <div className="flash bad">{error}</div>}
+
+      <div className="grid grid-2">
+        {/* Browse */}
+        <Card title="Library">
+          <div className="row" style={{ marginBottom: 12 }}>
+            <div>
+              <select value={serverId ?? ""} onChange={(e) => setServerId(Number(e.target.value))}>
+                {servers.map((s) => (
+                  <option key={s.id} value={s.id}>
+                    {s.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <select
+                value={libraryKey ?? ""}
+                onChange={(e) => setLibraryKey(e.target.value)}
+              >
+                {libraries.map((l) => (
+                  <option key={l.key} value={l.key}>
+                    {l.title} ({l.item_count ?? "?"})
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
+
+          <form className="search-row" onSubmit={runSearch}>
+            <input
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Search titles…"
+            />
+            <Button variant="ghost" icon={Search} type="submit">
+              Search
+            </Button>
+          </form>
+
+          <div className="list-scroll">
+            {results.length === 0 && !loading ? (
+              <EmptyState icon={Film} title="No titles">
+                Nothing here yet — pick a library or try a different search.
+              </EmptyState>
+            ) : (
+              results.map((it) => {
+                const added = selectedIds.has(it.id);
+                return (
+                  <div className="browse-row" key={it.id}>
+                    <div className="row-main">
+                      <div className="row-title">{it.title}</div>
+                      <div className="row-meta">
+                        {[it.year, formatRuntime(it.runtime_minutes)].filter(Boolean).join(" · ")}
+                      </div>
+                    </div>
+                    {added ? (
+                      <span className="added">
+                        <Check size={14} /> Added
+                      </span>
+                    ) : (
+                      <button className="icon-btn" onClick={() => add(it)} title="Add">
+                        <Plus size={16} />
+                      </button>
+                    )}
+                  </div>
+                );
+              })
+            )}
+            {loading && (
+              <div className="row-meta" style={{ padding: "12px 4px" }}>
+                <Spinner /> Loading…
+              </div>
+            )}
+          </div>
+
+          {hasMore && !loading && (
+            <div style={{ marginTop: 12 }}>
+              <Button variant="subtle" size="sm" onClick={() => loadItems(offset, false)}>
+                Load more
+              </Button>
+            </div>
+          )}
+        </Card>
+
+        {/* Selection */}
+        <Card title="Marathon order">
+          <div className="builder-summary">
+            <span>
+              <b>{selected.length}</b> titles
+            </span>
+            <span>
+              <b>{formatRuntime(totalRuntime)}</b> total
+            </span>
+          </div>
+
+          {selected.length === 0 ? (
+            <EmptyState icon={ListVideo} title="Empty">
+              Add titles from the library on the left, then drag the order with the
+              arrows. Save to persist, then push to Plex.
+            </EmptyState>
+          ) : (
+            <div className="list-scroll tall">
+              {selected.map((s, idx) => (
+                <div className="sel-row" key={s.server_item_id}>
+                  <span className="idx">{idx + 1}</span>
+                  <div className="row-main">
+                    <div className="row-title">{s.title}</div>
+                    <div className="row-meta">{formatRuntime(s.runtime_minutes)}</div>
+                  </div>
+                  <div className="sel-actions">
+                    <button
+                      className="icon-btn"
+                      onClick={() => move(idx, -1)}
+                      disabled={idx === 0}
+                      title="Move up"
+                    >
+                      <ChevronUp size={16} />
+                    </button>
+                    <button
+                      className="icon-btn"
+                      onClick={() => move(idx, 1)}
+                      disabled={idx === selected.length - 1}
+                      title="Move down"
+                    >
+                      <ChevronDown size={16} />
+                    </button>
+                    <button className="icon-btn" onClick={() => removeAt(idx)} title="Remove">
+                      <X size={16} />
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </Card>
+      </div>
+    </>
+  );
+}

@@ -55,7 +55,31 @@ class ServerTestResult(BaseModel):
     libraries: list[LibrarySectionOut] = []
 
 
+class LibraryItemOut(BaseModel):
+    id: str
+    title: str
+    type: str
+    year: Optional[int] = None
+    runtime_minutes: Optional[int] = None
+
+
 # --- Marathons -------------------------------------------------------------
+class MarathonItemIn(BaseModel):
+    server_item_id: str
+    title: str
+    runtime_minutes: Optional[int] = None
+
+
+class MarathonItemOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    position: int
+    server_item_id: str
+    title: str
+    runtime_minutes: Optional[int] = None
+    watched: bool
+
+
 class MarathonCreate(BaseModel):
     name: str
     description: Optional[str] = None
@@ -64,6 +88,14 @@ class MarathonCreate(BaseModel):
     ordering: str = "custom"
     watch_filter: Literal["all", "unwatched", "in_progress"] = "all"
     target_kind: Literal["playlist", "collection"] = "playlist"
+    items: list[MarathonItemIn] = []
+
+
+class MarathonUpdate(BaseModel):
+    name: Optional[str] = None
+    description: Optional[str] = None
+    # When provided, fully replaces the ordered item list.
+    items: Optional[list[MarathonItemIn]] = None
 
 
 class MarathonRead(BaseModel):
@@ -78,8 +110,21 @@ class MarathonRead(BaseModel):
     watch_filter: str
     target_kind: str
     server_playlist_id: Optional[str] = None
+    item_count: int = 0
+    total_runtime_minutes: int = 0
     created_at: datetime
     updated_at: datetime
+
+
+class MarathonDetail(MarathonRead):
+    items: list[MarathonItemOut] = []
+
+
+class PushResult(BaseModel):
+    ok: bool
+    server_playlist_id: Optional[str] = None
+    item_count: int = 0
+    message: Optional[str] = None
 
 
 class HealthOut(BaseModel):

@@ -67,3 +67,10 @@ export function Spinner() {
 export function isAuthError(message = "") {
   return message.startsWith("401") || message.startsWith("403");
 }
+
+export function formatRuntime(mins) {
+  if (!mins) return "—";
+  const h = Math.floor(mins / 60);
+  const m = mins % 60;
+  return h ? `${h}h ${m}m` : `${m}m`;
+}

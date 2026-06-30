@@ -130,11 +130,11 @@ Bingearr belongs in the ecosystem.
 - [x] Dockerfile + compose + healthcheck
 
 ### Phase 1 — MVP (current focus)
-- [ ] Plex connection UI (URL + token / sign-in)
-- [ ] Browse library; manual marathon builder (pick + order)
+- [x] Plex connection UI (URL + token / sign-in)
+- [x] Browse library; manual marathon builder (pick + order)
 - [ ] Rule: franchise/series order (TMDB collection / TVDB series)
-- [ ] Push marathon to Plex as a **native playlist**
-- [ ] Persist marathons; edit/rebuild/delete
+- [x] Push marathon to Plex as a **native playlist**
+- [x] Persist marathons; edit/rebuild/delete
 
 ### Phase 2 — Smart builder
 - [ ] Time-boxed builder (runtime budget)

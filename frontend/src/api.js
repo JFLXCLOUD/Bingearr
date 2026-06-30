@@ -26,12 +26,33 @@ async function req(path, opts = {}) {
   return ct.includes("application/json") ? res.json() : res.text();
 }
 
+function qs(params) {
+  const p = new URLSearchParams();
+  Object.entries(params).forEach(([k, v]) => {
+    if (v !== undefined && v !== null && v !== "") p.set(k, v);
+  });
+  const s = p.toString();
+  return s ? `?${s}` : "";
+}
+
 export const api = {
   health: () => req("/api/health"),
+
+  // Servers
   listServers: () => req("/api/servers"),
-  createServer: (body) =>
-    req("/api/servers", { method: "POST", body: JSON.stringify(body) }),
+  createServer: (body) => req("/api/servers", { method: "POST", body: JSON.stringify(body) }),
   deleteServer: (id) => req(`/api/servers/${id}`, { method: "DELETE" }),
   testServer: (id) => req(`/api/servers/${id}/test`, { method: "POST" }),
+  listLibraries: (id) => req(`/api/servers/${id}/libraries`),
+  listItems: (id, libraryKey, { search, limit, offset } = {}) =>
+    req(`/api/servers/${id}/libraries/${libraryKey}/items${qs({ search, limit, offset })}`),
+
+  // Marathons
   listMarathons: () => req("/api/marathons"),
+  getMarathon: (id) => req(`/api/marathons/${id}`),
+  createMarathon: (body) => req("/api/marathons", { method: "POST", body: JSON.stringify(body) }),
+  updateMarathon: (id, body) =>
+    req(`/api/marathons/${id}`, { method: "PUT", body: JSON.stringify(body) }),
+  deleteMarathon: (id) => req(`/api/marathons/${id}`, { method: "DELETE" }),
+  pushMarathon: (id) => req(`/api/marathons/${id}/push`, { method: "POST" }),
 };

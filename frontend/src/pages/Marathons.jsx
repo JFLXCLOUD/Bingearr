@@ -1,13 +1,26 @@
 import { useEffect, useState } from "react";
-import { Clapperboard, Plus, KeyRound, ArrowRight } from "lucide-react";
-import { Card, Button, EmptyState, isAuthError } from "../ui.jsx";
+import {
+  Clapperboard,
+  Plus,
+  KeyRound,
+  ArrowRight,
+  Trash2,
+  UploadCloud,
+  Pencil,
+  CheckCircle2,
+} from "lucide-react";
+import { Card, Button, EmptyState, Spinner, isAuthError, formatRuntime } from "../ui.jsx";
 import { api, getApiKey } from "../api.js";
+import Builder from "./Builder.jsx";
 
 export default function Marathons({ setPage }) {
+  const [view, setView] = useState({ mode: "list" });
   const [marathons, setMarathons] = useState([]);
   const [authMissing, setAuthMissing] = useState(!getApiKey());
+  const [pushing, setPushing] = useState({});
+  const [flash, setFlash] = useState(null);
 
-  useEffect(() => {
+  function load() {
     api
       .listMarathons()
       .then((m) => {
@@ -17,7 +30,9 @@ export default function Marathons({ setPage }) {
       .catch((e) => {
         if (isAuthError(e.message)) setAuthMissing(true);
       });
-  }, []);
+  }
+
+  useEffect(load, []);
 
   if (authMissing) {
     return (
@@ -37,37 +52,110 @@ export default function Marathons({ setPage }) {
     );
   }
 
+  if (view.mode === "builder") {
+    return (
+      <Builder
+        marathonId={view.id}
+        onClose={(saved) => {
+          setView({ mode: "list" });
+          if (saved) {
+            setFlash({ ok: true, msg: "Marathon saved. Push it to Plex when you're ready." });
+            load();
+          }
+        }}
+      />
+    );
+  }
+
+  function push(id) {
+    setPushing((p) => ({ ...p, [id]: true }));
+    setFlash(null);
+    api
+      .pushMarathon(id)
+      .then((r) => {
+        setFlash({
+          ok: true,
+          msg: `Pushed ${r.item_count} titles to Plex as a playlist. Open Plex to watch — it shows up in every client.`,
+        });
+        load();
+      })
+      .catch((e) => setFlash({ ok: false, msg: e.message }))
+      .finally(() => setPushing((p) => ({ ...p, [id]: false })));
+  }
+
+  function remove(id) {
+    api.deleteMarathon(id).then(load).catch((e) => setFlash({ ok: false, msg: e.message }));
+  }
+
   return (
     <Card
       title="Marathons"
-      sub="Manual picks and franchise/series order, pushed to Plex as a native playlist."
+      sub="Manual picks, pushed to Plex as a native playlist."
       action={
-        <Button icon={Plus} disabled title="Arrives in Phase 1">
+        <Button icon={Plus} onClick={() => setView({ mode: "builder" })}>
           New marathon
         </Button>
       }
     >
+      {flash && <div className={`flash ${flash.ok ? "ok" : "bad"}`}>{flash.msg}</div>}
+
       {marathons.length === 0 ? (
         <EmptyState icon={Clapperboard} title="No marathons yet">
-          The marathon builder lands in Phase 1: browse a connected library, pick
-          and order titles (or let a franchise/series rule do it), then push the
-          result to Plex as a native playlist that shows up in every client.
+          Build your first one: browse a connected library, pick and order titles,
+          then push the result to Plex as a native playlist that shows up in every
+          client.
         </EmptyState>
       ) : (
         <table className="table">
           <thead>
             <tr>
               <th>Name</th>
-              <th>Type</th>
-              <th>Target</th>
+              <th>Titles</th>
+              <th>Runtime</th>
+              <th>Status</th>
+              <th className="right">Actions</th>
             </tr>
           </thead>
           <tbody>
             {marathons.map((m) => (
               <tr key={m.id}>
                 <td>{m.name}</td>
-                <td><span className="badge">{m.type}</span></td>
-                <td className="muted">{m.target_kind}</td>
+                <td>{m.item_count}</td>
+                <td className="muted">{formatRuntime(m.total_runtime_minutes)}</td>
+                <td>
+                  {m.server_playlist_id ? (
+                    <span className="test-line ok">
+                      <CheckCircle2 size={14} /> On Plex
+                    </span>
+                  ) : (
+                    <span className="badge">Draft</span>
+                  )}
+                </td>
+                <td className="right">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    icon={Pencil}
+                    onClick={() => setView({ mode: "builder", id: m.id })}
+                  >
+                    Edit
+                  </Button>{" "}
+                  <Button
+                    variant="primary"
+                    size="sm"
+                    icon={pushing[m.id] ? undefined : UploadCloud}
+                    onClick={() => push(m.id)}
+                    disabled={pushing[m.id] || m.item_count === 0}
+                  >
+                    {pushing[m.id] ? <Spinner /> : m.server_playlist_id ? "Re-push" : "Push to Plex"}
+                  </Button>{" "}
+                  <Button
+                    variant="danger"
+                    size="sm"
+                    icon={Trash2}
+                    onClick={() => remove(m.id)}
+                  />
+                </td>
               </tr>
             ))}
           </tbody>

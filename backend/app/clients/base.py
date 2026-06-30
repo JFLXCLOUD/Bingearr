@@ -49,11 +49,20 @@ class MediaServerClient(ABC):
         """List library sections."""
 
     @abstractmethod
-    def list_items(self, library_key: str, limit: int = 100) -> list[MediaItem]:
-        """List items in a library section."""
+    def list_items(
+        self,
+        library_key: str,
+        search: str | None = None,
+        limit: int = 50,
+        offset: int = 0,
+    ) -> list[MediaItem]:
+        """List/search items in a library section (paginated)."""
 
-    # --- Phase 1 write op (default raises so read-only clients stay valid) ---
+    # --- Write ops (default raises so read-only clients stay valid) ---
     def create_playlist(self, title: str, item_ids: list[str]) -> str:
-        raise NotImplementedError(
-            "create_playlist is a Phase 1 feature and not implemented yet."
-        )
+        """Create a native playlist from ordered item ids; return its id."""
+        raise NotImplementedError
+
+    def delete_playlist(self, playlist_id: str) -> None:
+        """Delete a native playlist by id (no-op if it no longer exists)."""
+        raise NotImplementedError

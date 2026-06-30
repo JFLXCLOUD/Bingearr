@@ -44,13 +44,25 @@ class PlexClient(MediaServerClient):
             )
         return out
 
-    def list_items(self, library_key: str, limit: int = 100) -> list[MediaItem]:
+    def list_items(
+        self,
+        library_key: str,
+        search: str | None = None,
+        limit: int = 50,
+        offset: int = 0,
+    ) -> list[MediaItem]:
         section = self.server.library.sectionByID(int(library_key))
+        filters: dict = {}
+        if search:
+            filters["title__icontains"] = search
+        # Server-side pagination; guids are skipped here to keep browsing fast.
+        results = section.search(
+            maxresults=limit, container_start=offset, container_size=limit, **filters
+        )
         items: list[MediaItem] = []
-        for it in section.all()[:limit]:
+        for it in results:
             duration = getattr(it, "duration", None)
             runtime = int(duration / 60000) if duration else None
-            guids = [g.id for g in getattr(it, "guids", []) if getattr(g, "id", None)]
             items.append(
                 MediaItem(
                     id=str(it.ratingKey),
@@ -58,7 +70,19 @@ class PlexClient(MediaServerClient):
                     type=it.type,
                     year=getattr(it, "year", None),
                     runtime_minutes=runtime,
-                    guids=guids,
                 )
             )
         return items
+
+    def create_playlist(self, title: str, item_ids: list[str]) -> str:
+        items = [self.server.fetchItem(int(i)) for i in item_ids]
+        if not items:
+            raise ValueError("Cannot create an empty playlist.")
+        playlist = self.server.createPlaylist(title, items=items)
+        return str(playlist.ratingKey)
+
+    def delete_playlist(self, playlist_id: str) -> None:
+        for pl in self.server.playlists():
+            if str(pl.ratingKey) == str(playlist_id):
+                pl.delete()
+                return
