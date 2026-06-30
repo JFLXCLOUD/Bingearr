@@ -145,9 +145,9 @@ Bingearr belongs in the ecosystem.
 - [x] Scheduling — recurrence (hourly/daily/weekly) + background loop that
       re-resolves recipe marathons and re-pushes to Plex; manual "Run now"
 
-### Phase 3 — NeXroll prerolls (Bingearr side ✅)
-- [ ] Add the NeXroll integration API on the NeXroll side — contract written in
-      `docs/nexroll-integration.md`; needs implementing in the NeXroll repo
+### Phase 3 — NeXroll prerolls ✅
+- [x] NeXroll integration API on the NeXroll side — implemented in
+      JFLXCLOUD/NeXroll PR #32; contract in `docs/nexroll-integration.md`
 - [x] `NeXrollConnection` (connect/status/prerolls) + attach preroll to a marathon
 - [x] Apply/clear (manual activate/teardown; auto-apply-on-activate later)
 

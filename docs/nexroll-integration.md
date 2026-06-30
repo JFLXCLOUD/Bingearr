@@ -1,8 +1,8 @@
 # NeXroll ↔ Bingearr integration contract
 
 Bingearr talks to a small, **stable public API on NeXroll** (not its internal
-endpoints). You own both projects, so add these four routes to NeXroll. Bingearr
-already implements the calling side (`app/clients/nexroll.py`).
+endpoints). Bingearr implements the calling side (`app/clients/nexroll.py`); the
+NeXroll side is implemented in **JFLXCLOUD/NeXroll PR #32**.
 
 - **Auth:** `X-Api-Key` header. Use a NeXroll-issued integration key; Bingearr
   stores it as a `NeXrollConnection` (`base_url` + `api_key`).
