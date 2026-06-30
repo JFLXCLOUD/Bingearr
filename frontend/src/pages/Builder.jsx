@@ -289,6 +289,24 @@ export default function Builder({ marathonId, onClose }) {
     }
   }
 
+  const [generatingPromo, setGeneratingPromo] = useState(false);
+  async function generatePromo() {
+    setGeneratingPromo(true);
+    setPrerollMsg(null);
+    try {
+      const r = await api.generatePreroll(marathonId);
+      setPreroll(r.preroll);
+      setPrerollMsg({
+        ok: true,
+        text: `${r.message}${r.used_playlist_art ? "" : " (no playlist art yet — push to Plex first for the poster)"}`,
+      });
+      if (nexrollConn) api.nexrollPrerolls(nexrollConn.id).then(setPrerolls).catch(() => {});
+    } catch (e) {
+      setPrerollMsg({ ok: false, text: e.message });
+    }
+    setGeneratingPromo(false);
+  }
+
   const totalRuntime = selected.reduce((a, s) => a + (s.runtime_minutes || 0), 0);
   const canSave = name.trim() && selected.length > 0 && serverId;
 
@@ -642,7 +660,22 @@ export default function Builder({ marathonId, onClose }) {
         <Card title="Preroll" sub="Play a NeXroll preroll when this marathon is activated.">
           {nexrollConn ? (
             <>
-              <Field label="NeXroll preroll">
+              {marathonId && (
+                <div style={{ marginBottom: 14 }}>
+                  <Button
+                    icon={generatingPromo ? undefined : Sparkles}
+                    onClick={generatePromo}
+                    disabled={generatingPromo}
+                  >
+                    {generatingPromo ? <Spinner /> : "Generate promo from playlist"}
+                  </Button>
+                  <p className="row-meta" style={{ marginTop: 8 }}>
+                    Builds a “Check out … now on {servers.find((s) => s.id === serverId)?.name || "your server"}”
+                    preroll from the playlist art and adds it to NeXroll’s locked Bingearr category.
+                  </p>
+                </div>
+              )}
+              <Field label={marathonId ? "Or pick an existing preroll" : "NeXroll preroll"}>
                 <select
                   value={preroll ? `${preroll.type}:${preroll.id}` : ""}
                   onChange={(e) => {

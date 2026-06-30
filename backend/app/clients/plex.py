@@ -199,3 +199,22 @@ class PlexClient(MediaServerClient):
             if str(pl.ratingKey) == str(playlist_id):
                 pl.delete()
                 return
+
+    def get_playlist_poster(self, playlist_id: str) -> bytes | None:
+        """Return the playlist's composite poster image bytes, or None."""
+        import httpx
+
+        for pl in self.server.playlists():
+            if str(pl.ratingKey) != str(playlist_id):
+                continue
+            url = getattr(pl, "thumbUrl", None)
+            if not url:
+                return None
+            try:
+                r = httpx.get(url, timeout=self.timeout, verify=False)
+                if r.status_code == 200 and r.content:
+                    return r.content
+            except Exception:
+                return None
+            return None
+        return None

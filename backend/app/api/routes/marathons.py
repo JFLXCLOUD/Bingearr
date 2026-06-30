@@ -3,17 +3,21 @@
 from __future__ import annotations
 
 import json
+import os
+import tempfile
 from datetime import datetime
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from ...clients import get_media_client
 from ...clients.nexroll import NeXrollClient
 from ...config import settings
 from ...db.database import get_session
 from ...models import Marathon, MarathonItem, MediaServer, NeXrollConnection
 from ...services.builder import PushError, push_marathon
+from ...services.preroll import generate_promo
 from ...services.scheduler import compute_next_run, rebuild_and_push
 from ..deps import require_api_key
 from ..schemas import (
@@ -228,6 +232,65 @@ def apply_preroll(marathon_id: int, db: Session = Depends(get_session)) -> Apply
     except Exception as exc:  # noqa: BLE001 — normalize NeXroll/transport errors
         raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=str(exc))
     return ApplyResult(applied=bool(res.get("applied", True)), message=res.get("message"))
+
+
+@router.post("/{marathon_id}/preroll/generate")
+def generate_preroll(marathon_id: int, db: Session = Depends(get_session)) -> dict:
+    """Render a promo from the marathon's playlist art and inject it into
+    NeXroll's locked Bingearr category, then attach the generated sequence."""
+    marathon = _get_or_404(db, marathon_id)
+    if marathon.server_id is None:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Marathon is not bound to a media server.")
+    server = db.get(MediaServer, marathon.server_id)
+    if server is None:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="The marathon's media server no longer exists.")
+    conn = _first_nexroll(db)
+
+    poster = None
+    try:
+        client = get_media_client(server)
+        if marathon.server_playlist_id:
+            poster = client.get_playlist_poster(marathon.server_playlist_id)
+    except Exception:
+        poster = None
+
+    items = sorted(marathon.items, key=lambda i: i.position)
+    total = sum(i.runtime_minutes or 0 for i in items)
+    subtitle = f"{len(items)} titles · {total // 60}h {total % 60}m" if items else None
+
+    fd, mp4 = tempfile.mkstemp(suffix=".mp4")
+    os.close(fd)
+    try:
+        try:
+            generate_promo(mp4, marathon.name, server.name, subtitle, poster)
+        except Exception as exc:  # noqa: BLE001 — surface ffmpeg/render failures
+            raise HTTPException(status_code=500, detail=f"Could not render the promo: {exc}")
+        nx = NeXrollClient(conn.base_url, conn.api_key, timeout=settings.plex_timeout)
+        try:
+            result = nx.upload_preroll(mp4, marathon.name, marathon.id)
+        except Exception as exc:  # noqa: BLE001 — normalize NeXroll/transport errors
+            raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=f"NeXroll rejected the promo: {exc}")
+    finally:
+        try:
+            os.remove(mp4)
+        except Exception:
+            pass
+
+    preroll = {
+        "id": str(result.get("sequence_id")),
+        "type": "sequence",
+        "name": f"Bingearr — {marathon.name}",
+        "generated": True,
+    }
+    marathon.preroll_ref = json.dumps(preroll)
+    db.commit()
+    return {
+        "ok": True,
+        "preroll": preroll,
+        "category": result.get("category"),
+        "used_playlist_art": bool(poster),
+        "message": f"Generated a promo and added it to NeXroll's '{result.get('category')}' category.",
+    }
 
 
 @router.post("/{marathon_id}/preroll/clear", response_model=ApplyResult)

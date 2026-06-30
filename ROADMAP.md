@@ -150,6 +150,9 @@ Bingearr belongs in the ecosystem.
       JFLXCLOUD/NeXroll PR #32; contract in `docs/nexroll-integration.md`
 - [x] `NeXrollConnection` (connect/status/prerolls) + attach preroll to a marathon
 - [x] Apply/clear (manual activate/teardown; auto-apply-on-activate later)
+- [x] Generate a promo preroll from the playlist art ("Check out … on {server}")
+      and inject it into NeXroll's locked `Bingearr` system category
+      (Pillow + ffmpeg; NeXroll ingest endpoint in PR #32)
 
 ### Phase 4 — Portable recipes + gap-fill
 - [ ] Recipe export/import (schema v1)

@@ -67,6 +67,7 @@ export const api = {
   rebuildMarathon: (id) => req(`/api/marathons/${id}/rebuild`, { method: "POST" }),
   applyPreroll: (id) => req(`/api/marathons/${id}/preroll/apply`, { method: "POST" }),
   clearPreroll: (id) => req(`/api/marathons/${id}/preroll/clear`, { method: "POST" }),
+  generatePreroll: (id) => req(`/api/marathons/${id}/preroll/generate`, { method: "POST" }),
 
   // NeXroll
   listNexroll: () => req("/api/nexroll"),

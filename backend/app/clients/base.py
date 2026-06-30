@@ -103,3 +103,7 @@ class MediaServerClient(ABC):
     def delete_playlist(self, playlist_id: str) -> None:
         """Delete a native playlist by id (no-op if it no longer exists)."""
         raise NotImplementedError
+
+    def get_playlist_poster(self, playlist_id: str) -> bytes | None:
+        """Return the playlist's composite poster image bytes, or None."""
+        return None

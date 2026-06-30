@@ -45,6 +45,25 @@ Revert to NeXroll's normal preroll schedule. Called on **teardown**.
 { "applied": false, "message": "Reverted to NeXroll's normal schedule" }
 ```
 
+### `POST /api/integration/preroll`  (multipart)
+Ingest a **Bingearr-generated promo** video into a locked `Bingearr` **system
+category** (`is_system=True`, read-only in the NeXroll UI), and (re)create a
+one-preroll sequence so the promo can be applied precisely.
+
+Form fields: `file` (the MP4), `name`, optional `marathon_id` (stable filename
+so re-generation replaces).
+```json
+{
+  "ok": true,
+  "preroll_id": 4,
+  "category": "Bingearr",
+  "category_id": 3,
+  "sequence_id": 2,
+  "ref": "sequence:2"
+}
+```
+Bingearr stores `ref` as the marathon's preroll and applies it via `/apply`.
+
 ## Bingearr flow
 
 1. User connects NeXroll in **Settings** (`base_url` + `api_key`) → `status`.

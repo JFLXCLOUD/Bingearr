@@ -46,3 +46,22 @@ class NeXrollClient:
         r = httpx.post(self._url("clear"), json={}, headers=self._headers, timeout=self.timeout)
         r.raise_for_status()
         return r.json()
+
+    def upload_preroll(self, file_path: str, name: str, marathon_id: int | None = None) -> dict:
+        """Upload a generated promo into NeXroll's locked Bingearr category."""
+        import os
+
+        data = {"name": name}
+        if marathon_id is not None:
+            data["marathon_id"] = str(marathon_id)
+        with open(file_path, "rb") as fh:
+            files = {"file": (os.path.basename(file_path), fh, "video/mp4")}
+            r = httpx.post(
+                self._url("preroll"),
+                headers=self._headers,  # multipart Content-Type set by httpx
+                data=data,
+                files=files,
+                timeout=120,
+            )
+        r.raise_for_status()
+        return r.json()
