@@ -37,6 +37,13 @@ class MediaItem:
     guids: list[str] = field(default_factory=list)
 
 
+@dataclass
+class CollectionInfo:
+    id: str
+    title: str
+    item_count: int | None = None
+
+
 class MediaServerClient(ABC):
     """Read/curate interface over a Plex or Jellyfin server."""
 
@@ -57,6 +64,21 @@ class MediaServerClient(ABC):
         offset: int = 0,
     ) -> list[MediaItem]:
         """List/search items in a library section (paginated)."""
+
+    # --- Rule-based building (default raises; Plex implements) ---
+    def list_collections(self, library_key: str) -> list["CollectionInfo"]:
+        """List a library's collections."""
+        raise NotImplementedError
+
+    def expand_collection(self, collection_id: str) -> list[MediaItem]:
+        """Return a collection's items in release order."""
+        raise NotImplementedError
+
+    def expand_show(
+        self, show_id: str, order: str = "air", unwatched_only: bool = False
+    ) -> list[MediaItem]:
+        """Return a show's episodes in order (optionally unwatched only)."""
+        raise NotImplementedError
 
     # --- Write ops (default raises so read-only clients stay valid) ---
     def create_playlist(self, title: str, item_ids: list[str]) -> str:

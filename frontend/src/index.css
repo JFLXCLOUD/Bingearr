@@ -447,3 +447,44 @@ input:focus, select:focus {
   padding: 4px 2px 14px;
 }
 .builder-summary b { color: var(--text); font-weight: 600; }
+
+/* Segmented control (Titles / Collections) */
+.segment {
+  display: inline-flex;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: 9px;
+  padding: 3px;
+  margin-bottom: 14px;
+}
+.segment button {
+  border: none;
+  background: none;
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 500;
+  padding: 6px 14px;
+  border-radius: 7px;
+  cursor: pointer;
+  transition: background 0.12s ease, color 0.12s ease;
+}
+.segment button.active { background: var(--accent-soft); color: #fff; }
+
+.check {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--muted);
+  cursor: pointer;
+  user-select: none;
+}
+.check input { width: auto; }
+.row-tag {
+  font-size: 11px;
+  color: var(--accent-2);
+  background: var(--accent-soft);
+  padding: 2px 7px;
+  border-radius: 5px;
+  margin-left: 8px;
+}

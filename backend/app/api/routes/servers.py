@@ -12,6 +12,7 @@ from ...db.database import get_session
 from ...models import MediaServer
 from ..deps import require_api_key
 from ..schemas import (
+    CollectionOut,
     LibraryItemOut,
     LibrarySectionOut,
     ServerCreate,
@@ -39,6 +40,15 @@ def _client_or_error(server: MediaServer) -> MediaServerClient:
         return get_media_client(server)
     except NotImplementedError as exc:
         raise HTTPException(status_code=status.HTTP_501_NOT_IMPLEMENTED, detail=str(exc))
+
+
+def _items_out(items) -> list[LibraryItemOut]:
+    return [
+        LibraryItemOut(
+            id=i.id, title=i.title, type=i.type, year=i.year, runtime_minutes=i.runtime_minutes
+        )
+        for i in items
+    ]
 
 
 @router.get("", response_model=list[ServerRead])
@@ -125,9 +135,45 @@ def list_library_items(
         items = client.list_items(library_key, search=search, limit=limit, offset=offset)
     except Exception as exc:  # noqa: BLE001 — surface upstream errors as 502
         raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=str(exc))
-    return [
-        LibraryItemOut(
-            id=i.id, title=i.title, type=i.type, year=i.year, runtime_minutes=i.runtime_minutes
+    return _items_out(items)
+
+
+@router.get("/{server_id}/libraries/{library_key}/collections", response_model=list[CollectionOut])
+def list_collections(server_id: int, library_key: str, db: Session = Depends(get_session)):
+    server = _get_or_404(db, server_id)
+    client = _client_or_error(server)
+    try:
+        return [
+            CollectionOut(id=c.id, title=c.title, item_count=c.item_count)
+            for c in client.list_collections(library_key)
+        ]
+    except Exception as exc:  # noqa: BLE001 — surface upstream errors as 502
+        raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=str(exc))
+
+
+@router.get("/{server_id}/collections/{collection_id}/items", response_model=list[LibraryItemOut])
+def expand_collection(server_id: int, collection_id: str, db: Session = Depends(get_session)):
+    server = _get_or_404(db, server_id)
+    client = _client_or_error(server)
+    try:
+        return _items_out(client.expand_collection(collection_id))
+    except Exception as exc:  # noqa: BLE001 — surface upstream errors as 502
+        raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=str(exc))
+
+
+@router.get("/{server_id}/shows/{show_id}/episodes", response_model=list[LibraryItemOut])
+def expand_show(
+    server_id: int,
+    show_id: str,
+    order: str = "air",
+    unwatched_only: bool = False,
+    db: Session = Depends(get_session),
+):
+    server = _get_or_404(db, server_id)
+    client = _client_or_error(server)
+    try:
+        return _items_out(
+            client.expand_show(show_id, order=order, unwatched_only=unwatched_only)
         )
-        for i in items
-    ]
+    except Exception as exc:  # noqa: BLE001 — surface upstream errors as 502
+        raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=str(exc))

@@ -10,6 +10,7 @@ import {
   Save,
   Film,
   ListVideo,
+  Layers,
 } from "lucide-react";
 import { Card, Button, EmptyState, Spinner, formatRuntime } from "../ui.jsx";
 import { api } from "../api.js";
@@ -21,6 +22,7 @@ export default function Builder({ marathonId, onClose }) {
   const [serverId, setServerId] = useState(null);
   const [libraries, setLibraries] = useState([]);
   const [libraryKey, setLibraryKey] = useState(null);
+  const [tab, setTab] = useState("titles"); // titles | collections
 
   const [search, setSearch] = useState("");
   const [results, setResults] = useState([]);
@@ -28,10 +30,17 @@ export default function Builder({ marathonId, onClose }) {
   const [hasMore, setHasMore] = useState(false);
   const [loading, setLoading] = useState(false);
 
+  const [collections, setCollections] = useState([]);
+  const [unwatchedOnly, setUnwatchedOnly] = useState(false);
+  const [busy, setBusy] = useState("");
+
   const [selected, setSelected] = useState([]);
   const [name, setName] = useState("");
   const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
+
+  const currentLib = libraries.find((l) => l.key === libraryKey);
+  const isShows = currentLib?.type === "show";
 
   // Servers
   useEffect(() => {
@@ -78,11 +87,22 @@ export default function Builder({ marathonId, onClose }) {
       .catch((e) => setError(e.message));
   }, [serverId]);
 
-  // Items when the library changes
+  // Titles when the library changes
   useEffect(() => {
-    if (serverId && libraryKey) loadItems(0, true);
+    if (serverId && libraryKey && tab === "titles") loadItems(0, true);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [serverId, libraryKey]);
+  }, [serverId, libraryKey, tab]);
+
+  // Collections when switching to that tab
+  useEffect(() => {
+    if (!(serverId && libraryKey && tab === "collections")) return;
+    setCollections([]);
+    api
+      .listCollections(serverId, libraryKey)
+      .then(setCollections)
+      .catch((e) => setError(e.message));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [serverId, libraryKey, tab]);
 
   function loadItems(off, reset) {
     setLoading(true);
@@ -105,13 +125,46 @@ export default function Builder({ marathonId, onClose }) {
 
   const selectedIds = new Set(selected.map((s) => s.server_item_id));
 
-  function add(it) {
-    if (selectedIds.has(it.id)) return;
-    setSelected([
-      ...selected,
-      { server_item_id: it.id, title: it.title, runtime_minutes: it.runtime_minutes },
-    ]);
+  function appendItems(items) {
+    setSelected((prev) => {
+      const have = new Set(prev.map((s) => s.server_item_id));
+      const add = items
+        .filter((i) => !have.has(i.id))
+        .map((i) => ({
+          server_item_id: i.id,
+          title: i.title,
+          runtime_minutes: i.runtime_minutes,
+        }));
+      return [...prev, ...add];
+    });
   }
+
+  async function addSeries(show) {
+    setBusy(show.id);
+    setError("");
+    try {
+      const eps = await api.expandShow(serverId, show.id, {
+        unwatched_only: unwatchedOnly || undefined,
+      });
+      appendItems(eps);
+    } catch (e) {
+      setError(e.message);
+    }
+    setBusy("");
+  }
+
+  async function addCollection(col) {
+    setBusy(col.id);
+    setError("");
+    try {
+      const items = await api.expandCollection(serverId, col.id);
+      appendItems(items);
+    } catch (e) {
+      setError(e.message);
+    }
+    setBusy("");
+  }
+
   function removeAt(idx) {
     setSelected(selected.filter((_, i) => i !== idx));
   }
@@ -169,7 +222,7 @@ export default function Builder({ marathonId, onClose }) {
       {error && <div className="flash bad">{error}</div>}
 
       <div className="grid grid-2">
-        {/* Browse */}
+        {/* Browse / rules */}
         <Card title="Library">
           <div className="row" style={{ marginBottom: 12 }}>
             <div>
@@ -182,10 +235,7 @@ export default function Builder({ marathonId, onClose }) {
               </select>
             </div>
             <div>
-              <select
-                value={libraryKey ?? ""}
-                onChange={(e) => setLibraryKey(e.target.value)}
-              >
+              <select value={libraryKey ?? ""} onChange={(e) => setLibraryKey(e.target.value)}>
                 {libraries.map((l) => (
                   <option key={l.key} value={l.key}>
                     {l.title} ({l.item_count ?? "?"})
@@ -195,58 +245,124 @@ export default function Builder({ marathonId, onClose }) {
             </div>
           </div>
 
-          <form className="search-row" onSubmit={runSearch}>
-            <input
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              placeholder="Search titles…"
-            />
-            <Button variant="ghost" icon={Search} type="submit">
-              Search
-            </Button>
-          </form>
-
-          <div className="list-scroll">
-            {results.length === 0 && !loading ? (
-              <EmptyState icon={Film} title="No titles">
-                Nothing here yet — pick a library or try a different search.
-              </EmptyState>
-            ) : (
-              results.map((it) => {
-                const added = selectedIds.has(it.id);
-                return (
-                  <div className="browse-row" key={it.id}>
-                    <div className="row-main">
-                      <div className="row-title">{it.title}</div>
-                      <div className="row-meta">
-                        {[it.year, formatRuntime(it.runtime_minutes)].filter(Boolean).join(" · ")}
-                      </div>
-                    </div>
-                    {added ? (
-                      <span className="added">
-                        <Check size={14} /> Added
-                      </span>
-                    ) : (
-                      <button className="icon-btn" onClick={() => add(it)} title="Add">
-                        <Plus size={16} />
-                      </button>
-                    )}
-                  </div>
-                );
-              })
-            )}
-            {loading && (
-              <div className="row-meta" style={{ padding: "12px 4px" }}>
-                <Spinner /> Loading…
-              </div>
-            )}
+          <div className="segment">
+            <button className={tab === "titles" ? "active" : ""} onClick={() => setTab("titles")}>
+              {isShows ? "Series" : "Titles"}
+            </button>
+            <button
+              className={tab === "collections" ? "active" : ""}
+              onClick={() => setTab("collections")}
+            >
+              Collections
+            </button>
           </div>
 
-          {hasMore && !loading && (
-            <div style={{ marginTop: 12 }}>
-              <Button variant="subtle" size="sm" onClick={() => loadItems(offset, false)}>
-                Load more
-              </Button>
+          {tab === "titles" ? (
+            <>
+              {isShows && (
+                <label className="check" style={{ marginBottom: 12 }}>
+                  <input
+                    type="checkbox"
+                    checked={unwatchedOnly}
+                    onChange={(e) => setUnwatchedOnly(e.target.checked)}
+                  />
+                  Unwatched episodes only
+                </label>
+              )}
+              <form className="search-row" onSubmit={runSearch}>
+                <input
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  placeholder={isShows ? "Search shows…" : "Search titles…"}
+                />
+                <Button variant="ghost" icon={Search} type="submit">
+                  Search
+                </Button>
+              </form>
+
+              <div className="list-scroll">
+                {results.length === 0 && !loading ? (
+                  <EmptyState icon={Film} title="No titles">
+                    Nothing here yet — pick a library or try a different search.
+                  </EmptyState>
+                ) : (
+                  results.map((it) => {
+                    const added = selectedIds.has(it.id);
+                    return (
+                      <div className="browse-row" key={it.id}>
+                        <div className="row-main">
+                          <div className="row-title">
+                            {it.title}
+                            {isShows && <span className="row-tag">full series</span>}
+                          </div>
+                          <div className="row-meta">
+                            {[it.year, !isShows && formatRuntime(it.runtime_minutes)]
+                              .filter(Boolean)
+                              .join(" · ")}
+                          </div>
+                        </div>
+                        {isShows ? (
+                          <button
+                            className="icon-btn"
+                            onClick={() => addSeries(it)}
+                            disabled={busy === it.id}
+                            title="Add full series in order"
+                          >
+                            {busy === it.id ? <Spinner /> : <Plus size={16} />}
+                          </button>
+                        ) : added ? (
+                          <span className="added">
+                            <Check size={14} /> Added
+                          </span>
+                        ) : (
+                          <button className="icon-btn" onClick={() => appendItems([it])} title="Add">
+                            <Plus size={16} />
+                          </button>
+                        )}
+                      </div>
+                    );
+                  })
+                )}
+                {loading && (
+                  <div className="row-meta" style={{ padding: "12px 4px" }}>
+                    <Spinner /> Loading…
+                  </div>
+                )}
+              </div>
+
+              {hasMore && !loading && tab === "titles" && (
+                <div style={{ marginTop: 12 }}>
+                  <Button variant="subtle" size="sm" onClick={() => loadItems(offset, false)}>
+                    Load more
+                  </Button>
+                </div>
+              )}
+            </>
+          ) : (
+            <div className="list-scroll">
+              {collections.length === 0 ? (
+                <EmptyState icon={Layers} title="No collections">
+                  This library has no Plex collections. Switch back to{" "}
+                  {isShows ? "Series" : "Titles"} to add items individually.
+                </EmptyState>
+              ) : (
+                collections.map((c) => (
+                  <div className="browse-row" key={c.id}>
+                    <div className="row-main">
+                      <div className="row-title">{c.title}</div>
+                      <div className="row-meta">{c.item_count ?? "?"} items</div>
+                    </div>
+                    <button
+                      className="icon-btn"
+                      onClick={() => addCollection(c)}
+                      disabled={busy === c.id}
+                      title="Add the whole collection"
+                    >
+                      {busy === c.id ? <Spinner /> : <Plus size={16} />}
+                    </button>
+                  </div>
+                ))
+              )}
             </div>
           )}
         </Card>
@@ -264,8 +380,8 @@ export default function Builder({ marathonId, onClose }) {
 
           {selected.length === 0 ? (
             <EmptyState icon={ListVideo} title="Empty">
-              Add titles from the library on the left, then drag the order with the
-              arrows. Save to persist, then push to Plex.
+              Add titles, a full series, or a collection from the left. Reorder
+              with the arrows, then save and push to Plex.
             </EmptyState>
           ) : (
             <div className="list-scroll tall">

@@ -2,7 +2,13 @@
 
 from __future__ import annotations
 
-from .base import ConnectionInfo, LibrarySection, MediaItem, MediaServerClient
+from .base import (
+    CollectionInfo,
+    ConnectionInfo,
+    LibrarySection,
+    MediaItem,
+    MediaServerClient,
+)
 
 
 class PlexClient(MediaServerClient):
@@ -69,6 +75,60 @@ class PlexClient(MediaServerClient):
                     title=it.title,
                     type=it.type,
                     year=getattr(it, "year", None),
+                    runtime_minutes=runtime,
+                )
+            )
+        return items
+
+    def list_collections(self, library_key: str) -> list[CollectionInfo]:
+        section = self.server.library.sectionByID(int(library_key))
+        out: list[CollectionInfo] = []
+        for col in section.collections():
+            out.append(
+                CollectionInfo(
+                    id=str(col.ratingKey),
+                    title=col.title,
+                    item_count=getattr(col, "childCount", None),
+                )
+            )
+        return out
+
+    def expand_collection(self, collection_id: str) -> list[MediaItem]:
+        collection = self.server.fetchItem(int(collection_id))
+        members = list(collection.items())
+        members.sort(key=lambda i: (getattr(i, "year", 0) or 0, getattr(i, "titleSort", i.title)))
+        items: list[MediaItem] = []
+        for it in members:
+            duration = getattr(it, "duration", None)
+            runtime = int(duration / 60000) if duration else None
+            items.append(
+                MediaItem(
+                    id=str(it.ratingKey),
+                    title=it.title,
+                    type=it.type,
+                    year=getattr(it, "year", None),
+                    runtime_minutes=runtime,
+                )
+            )
+        return items
+
+    def expand_show(
+        self, show_id: str, order: str = "air", unwatched_only: bool = False
+    ) -> list[MediaItem]:
+        show = self.server.fetchItem(int(show_id))
+        items: list[MediaItem] = []
+        for ep in show.episodes():  # plexapi returns episodes in air order
+            if unwatched_only and (getattr(ep, "viewCount", 0) or 0) > 0:
+                continue
+            season = getattr(ep, "parentIndex", 0) or 0
+            number = getattr(ep, "index", 0) or 0
+            duration = getattr(ep, "duration", None)
+            runtime = int(duration / 60000) if duration else None
+            items.append(
+                MediaItem(
+                    id=str(ep.ratingKey),
+                    title=f"S{season:02d}E{number:02d} · {ep.title}",
+                    type="episode",
                     runtime_minutes=runtime,
                 )
             )

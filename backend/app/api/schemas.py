@@ -63,6 +63,12 @@ class LibraryItemOut(BaseModel):
     runtime_minutes: Optional[int] = None
 
 
+class CollectionOut(BaseModel):
+    id: str
+    title: str
+    item_count: Optional[int] = None
+
+
 # --- Marathons -------------------------------------------------------------
 class MarathonItemIn(BaseModel):
     server_item_id: str

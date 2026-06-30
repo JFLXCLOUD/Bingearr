@@ -46,6 +46,12 @@ export const api = {
   listLibraries: (id) => req(`/api/servers/${id}/libraries`),
   listItems: (id, libraryKey, { search, limit, offset } = {}) =>
     req(`/api/servers/${id}/libraries/${libraryKey}/items${qs({ search, limit, offset })}`),
+  listCollections: (id, libraryKey) =>
+    req(`/api/servers/${id}/libraries/${libraryKey}/collections`),
+  expandCollection: (id, collectionId) =>
+    req(`/api/servers/${id}/collections/${collectionId}/items`),
+  expandShow: (id, showId, { order, unwatched_only } = {}) =>
+    req(`/api/servers/${id}/shows/${showId}/episodes${qs({ order, unwatched_only })}`),
 
   // Marathons
   listMarathons: () => req("/api/marathons"),

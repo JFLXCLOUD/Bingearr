@@ -129,10 +129,12 @@ Bingearr belongs in the ecosystem.
 - [x] React UI shell matching NeXroll
 - [x] Dockerfile + compose + healthcheck
 
-### Phase 1 — MVP (current focus)
+### Phase 1 — MVP ✅
 - [x] Plex connection UI (URL + token / sign-in)
 - [x] Browse library; manual marathon builder (pick + order)
-- [ ] Rule: franchise/series order (TMDB collection / TVDB series)
+- [x] Rule: franchise/series order — series (full show, air order) + Plex
+      collections, expanded into the builder. (TMDB/TVDB-ID portable recipes
+      land with the recipe work in Phase 4.)
 - [x] Push marathon to Plex as a **native playlist**
 - [x] Persist marathons; edit/rebuild/delete
 
