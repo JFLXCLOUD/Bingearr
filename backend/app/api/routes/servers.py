@@ -177,3 +177,35 @@ def expand_show(
         )
     except Exception as exc:  # noqa: BLE001 — surface upstream errors as 502
         raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=str(exc))
+
+
+@router.get("/{server_id}/libraries/{library_key}/genres", response_model=list[str])
+def list_genres(server_id: int, library_key: str, db: Session = Depends(get_session)):
+    server = _get_or_404(db, server_id)
+    client = _client_or_error(server)
+    try:
+        return client.list_genres(library_key)
+    except Exception as exc:  # noqa: BLE001 — surface upstream errors as 502
+        raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=str(exc))
+
+
+@router.get("/{server_id}/libraries/{library_key}/smart", response_model=list[LibraryItemOut])
+def smart_select(
+    server_id: int,
+    library_key: str,
+    genre: str | None = None,
+    watch: str = "all",
+    minutes: int | None = None,
+    max_items: int = 20,
+    db: Session = Depends(get_session),
+):
+    server = _get_or_404(db, server_id)
+    client = _client_or_error(server)
+    try:
+        return _items_out(
+            client.smart_select(
+                library_key, genre=genre, watch=watch, minutes=minutes, max_items=max_items
+            )
+        )
+    except Exception as exc:  # noqa: BLE001 — surface upstream errors as 502
+        raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=str(exc))

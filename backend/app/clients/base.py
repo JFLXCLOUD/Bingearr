@@ -80,6 +80,21 @@ class MediaServerClient(ABC):
         """Return a show's episodes in order (optionally unwatched only)."""
         raise NotImplementedError
 
+    def list_genres(self, library_key: str) -> list[str]:
+        """Available genre filter values for a library."""
+        raise NotImplementedError
+
+    def smart_select(
+        self,
+        library_key: str,
+        genre: str | None = None,
+        watch: str = "all",
+        minutes: int | None = None,
+        max_items: int = 20,
+    ) -> list[MediaItem]:
+        """Pick items by genre/watch-state, packed to fit a runtime budget."""
+        raise NotImplementedError
+
     # --- Write ops (default raises so read-only clients stay valid) ---
     def create_playlist(self, title: str, item_ids: list[str]) -> str:
         """Create a native playlist from ordered item ids; return its id."""

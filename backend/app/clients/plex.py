@@ -1,6 +1,8 @@
-"""Read-only Plex implementation of ``MediaServerClient`` (via python-plexapi)."""
+"""Plex implementation of ``MediaServerClient`` (via python-plexapi)."""
 
 from __future__ import annotations
+
+import random
 
 from .base import (
     CollectionInfo,
@@ -133,6 +135,57 @@ class PlexClient(MediaServerClient):
                 )
             )
         return items
+
+    def list_genres(self, library_key: str) -> list[str]:
+        section = self.server.library.sectionByID(int(library_key))
+        try:
+            return [c.title for c in section.listFilterChoices("genre")]
+        except Exception:  # noqa: BLE001 — library type may not support genres
+            return []
+
+    def smart_select(
+        self,
+        library_key: str,
+        genre: str | None = None,
+        watch: str = "all",
+        minutes: int | None = None,
+        max_items: int = 20,
+    ) -> list[MediaItem]:
+        section = self.server.library.sectionByID(int(library_key))
+        filters: dict = {}
+        if genre:
+            filters["genre"] = genre
+        if watch == "unwatched":
+            filters["unwatched"] = True
+        elif watch == "in_progress":
+            filters["inProgress"] = True
+
+        candidates = section.search(maxresults=600, **filters)
+        random.shuffle(candidates)
+
+        selected: list[MediaItem] = []
+        total = 0
+        for it in candidates:
+            duration = getattr(it, "duration", None)
+            runtime = int(duration / 60000) if duration else 0
+            if minutes:
+                if runtime <= 0 or total + runtime > minutes:
+                    continue
+                total += runtime
+            chosen = MediaItem(
+                id=str(it.ratingKey),
+                title=it.title,
+                type=it.type,
+                year=getattr(it, "year", None),
+                runtime_minutes=runtime or None,
+            )
+            selected.append(chosen)
+            if minutes:
+                if total >= minutes - 5:
+                    break
+            elif len(selected) >= max_items:
+                break
+        return selected
 
     def create_playlist(self, title: str, item_ids: list[str]) -> str:
         items = [self.server.fetchItem(int(i)) for i in item_ids]

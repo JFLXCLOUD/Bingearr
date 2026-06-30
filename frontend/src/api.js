@@ -52,6 +52,9 @@ export const api = {
     req(`/api/servers/${id}/collections/${collectionId}/items`),
   expandShow: (id, showId, { order, unwatched_only } = {}) =>
     req(`/api/servers/${id}/shows/${showId}/episodes${qs({ order, unwatched_only })}`),
+  listGenres: (id, libraryKey) => req(`/api/servers/${id}/libraries/${libraryKey}/genres`),
+  smartSelect: (id, libraryKey, { genre, watch, minutes, max_items } = {}) =>
+    req(`/api/servers/${id}/libraries/${libraryKey}/smart${qs({ genre, watch, minutes, max_items })}`),
 
   // Marathons
   listMarathons: () => req("/api/marathons"),

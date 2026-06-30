@@ -11,8 +11,9 @@ import {
   Film,
   ListVideo,
   Layers,
+  Sparkles,
 } from "lucide-react";
-import { Card, Button, EmptyState, Spinner, formatRuntime } from "../ui.jsx";
+import { Card, Button, Field, EmptyState, Spinner, formatRuntime } from "../ui.jsx";
 import { api } from "../api.js";
 
 const PAGE = 50;
@@ -33,6 +34,12 @@ export default function Builder({ marathonId, onClose }) {
   const [collections, setCollections] = useState([]);
   const [unwatchedOnly, setUnwatchedOnly] = useState(false);
   const [busy, setBusy] = useState("");
+
+  const [genres, setGenres] = useState([]);
+  const [genre, setGenre] = useState("");
+  const [watch, setWatch] = useState("all");
+  const [minutes, setMinutes] = useState(240);
+  const [generating, setGenerating] = useState(false);
 
   const [selected, setSelected] = useState([]);
   const [name, setName] = useState("");
@@ -104,6 +111,18 @@ export default function Builder({ marathonId, onClose }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [serverId, libraryKey, tab]);
 
+  // Genres when switching to the smart tab
+  useEffect(() => {
+    if (!(serverId && libraryKey && tab === "smart")) return;
+    api.listGenres(serverId, libraryKey).then(setGenres).catch(() => setGenres([]));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [serverId, libraryKey, tab]);
+
+  // Smart mode is movie-oriented; bounce off it for show libraries.
+  useEffect(() => {
+    if (isShows && tab === "smart") setTab("titles");
+  }, [isShows, tab]);
+
   function loadItems(off, reset) {
     setLoading(true);
     setError("");
@@ -163,6 +182,31 @@ export default function Builder({ marathonId, onClose }) {
       setError(e.message);
     }
     setBusy("");
+  }
+
+  async function generate() {
+    setGenerating(true);
+    setError("");
+    try {
+      const items = await api.smartSelect(serverId, libraryKey, {
+        genre: genre || undefined,
+        watch,
+        minutes: minutes || undefined,
+      });
+      if (items.length === 0) {
+        setError("No titles matched — try a wider genre, a different watch state, or a bigger budget.");
+      }
+      setSelected(
+        items.map((i) => ({
+          server_item_id: i.id,
+          title: i.title,
+          runtime_minutes: i.runtime_minutes,
+        }))
+      );
+    } catch (e) {
+      setError(e.message);
+    }
+    setGenerating(false);
   }
 
   function removeAt(idx) {
@@ -255,9 +299,14 @@ export default function Builder({ marathonId, onClose }) {
             >
               Collections
             </button>
+            {!isShows && (
+              <button className={tab === "smart" ? "active" : ""} onClick={() => setTab("smart")}>
+                Smart
+              </button>
+            )}
           </div>
 
-          {tab === "titles" ? (
+          {tab === "titles" && (
             <>
               {isShows && (
                 <label className="check" style={{ marginBottom: 12 }}>
@@ -338,7 +387,9 @@ export default function Builder({ marathonId, onClose }) {
                 </div>
               )}
             </>
-          ) : (
+          )}
+
+          {tab === "collections" && (
             <div className="list-scroll">
               {collections.length === 0 ? (
                 <EmptyState icon={Layers} title="No collections">
@@ -363,6 +414,48 @@ export default function Builder({ marathonId, onClose }) {
                   </div>
                 ))
               )}
+            </div>
+          )}
+
+          {tab === "smart" && (
+            <div>
+              <Field label="Genre">
+                <select value={genre} onChange={(e) => setGenre(e.target.value)}>
+                  <option value="">Any genre</option>
+                  {genres.map((g) => (
+                    <option key={g} value={g}>
+                      {g}
+                    </option>
+                  ))}
+                </select>
+              </Field>
+              <Field label="Watch state">
+                <select value={watch} onChange={(e) => setWatch(e.target.value)}>
+                  <option value="all">All</option>
+                  <option value="unwatched">Unwatched only</option>
+                  <option value="in_progress">Continue watching</option>
+                </select>
+              </Field>
+              <Field label="Time budget (minutes)">
+                <input
+                  type="number"
+                  min="30"
+                  step="30"
+                  value={minutes}
+                  onChange={(e) => setMinutes(Number(e.target.value))}
+                />
+              </Field>
+              <Button
+                icon={generating ? undefined : Sparkles}
+                onClick={generate}
+                disabled={generating}
+              >
+                {generating ? <Spinner /> : "Generate block"}
+              </Button>
+              <p className="row-meta" style={{ marginTop: 12 }}>
+                Packs a randomized set that fits your budget. Generating replaces the
+                current order.
+              </p>
             </div>
           )}
         </Card>
